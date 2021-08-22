@@ -1,4 +1,6 @@
 const User = require('../models/user');
+const jwt = require('jsonwebtoken');
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
 const signup_user = (req, res) => {
     let user = new User(req.body);
@@ -25,7 +27,7 @@ const login_user = (req, res) => {
         if(!user){
             res.send({
                 authenticated: false,
-                error: {email: 'Email not found'}
+                error: {email: 'Username not found'}
             })
         }
         else {
@@ -35,15 +37,15 @@ const login_user = (req, res) => {
                         authenticated: false,
                     })
                 }
+                //if the password does not match and previous session was not authenticated, do not authenticate
                 if(isMatch){
+                    const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET);
                     res.send({
-                        authenticated: true,
-                        user: user._doc
+                        accessToken: accessToken
                     })
                 }
                 else{
                     res.send({
-                        authenticated: false,
                         error: {password: 'Incorrect Password'}
                     })
                 }
