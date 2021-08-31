@@ -18,7 +18,7 @@ const SALT_WORK_FACTOR = Number(process.env.SALT_WORK_FACTOR);
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
-app.use(cors())
+app.use(cors());
 app.use(express.static(__dirname));
 app.use(bodyParser.urlencoded({extended: false}))
 app.use(bodyParser.json());
