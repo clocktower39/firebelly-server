@@ -8,7 +8,21 @@ const UserSchema = new mongoose.Schema({
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     password: { type: String, required: true },
-})
+    defaultTasks: { type: Array, required: true },
+    biometrics: { 
+        type: {
+            sex: { type: String, },
+            dateOfBirth: { type: Date },
+            height: { type: Number },
+        },
+        default: {
+            sex: "Unknown",
+            dateOfBirth: new Date("1901/01/01"),
+            height: 0
+        },
+        required: true,
+     },
+}, { minimize: false })
 
 UserSchema.pre('save', function(next) {
     let user = this;
