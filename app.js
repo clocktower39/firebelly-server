@@ -7,6 +7,9 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const userRoutes = require('./routes/userRoutes');
+const trainingRoutes = require('./routes/trainingRoutes');
+const nutritionRoutes = require('./routes/nutritionRoutes');
+const taskRoutes = require('./routes/taskRoutes');
 
 // require('dotenv').config();
 const dbUrl = process.env.DBURL;
@@ -24,6 +27,9 @@ app.use(bodyParser.urlencoded({extended: false}))
 app.use(bodyParser.json());
 
 app.use('/', userRoutes);
+app.use('/', trainingRoutes);
+app.use('/', nutritionRoutes);
+app.use('/', taskRoutes);
 
 mongoose.connect(dbUrl, 
     {

@@ -5,7 +5,7 @@ const nutritionSchema = new mongoose.Schema({
     unit: { type: String, required: true },
     goal: { type: Number, required: true },
     achieved: { type: Number, required: true },
-    accountId: { type: Number, required: true },
+    accountId: { type: String, required: true },
     date: { type: Date, required: true },
 })
 
