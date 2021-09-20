@@ -19,6 +19,15 @@ const create_task = (req, res) => {
     saveTask();
 }
 
+const update_task = (req, res) => {
+    Task.findByIdAndUpdate(req.body._id, { achieved: req.body.achieved }, { new: true}, (err, task) => {
+        if (err) throw err;
+        else {
+            res.send({ task });
+        }
+      })
+}
+
 const get_tasks = (req, res) => {
     Task.find({ accountId: req.body.accountId, date: req.body.date }, function(err, data) {
         if(err) throw err;
@@ -29,4 +38,5 @@ const get_tasks = (req, res) => {
 module.exports = {
     create_task,
     get_tasks,
+    update_task,
 }
