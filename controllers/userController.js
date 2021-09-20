@@ -56,10 +56,11 @@ const update_default_tasks = (req, res) => {
     { _id: req.body._id },
     { defaultTasks: req.body.defaultTasks },
     { new: true },    
-    (err, tasks) => {
+    (err, user) => {
         if (err) throw err;
         else {
-            res.send(tasks);
+            const accessToken = jwt.sign(JSON.stringify(user), ACCESS_TOKEN_SECRET);
+            res.send({ user, accessToken });
         }
       }
   );
