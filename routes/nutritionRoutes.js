@@ -5,5 +5,6 @@ const router = express.Router();
 
 router.post('/nutrition', nutritionController.get_nutrition);
 router.post('/createNutrition', nutritionController.create_nutrition);
+router.post('/updateNutrition', nutritionController.update_nutrition);
 
 module.exports = router;

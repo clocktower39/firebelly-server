@@ -19,6 +19,15 @@ const create_nutrition = (req, res) => {
     saveNutrition();
 }
 
+const update_nutrition = (req, res) => {
+    Nurition.findByIdAndUpdate(req.body._id, { achieved: req.body.achieved }, { new: true}, (err, nutrition) => {
+        if (err) throw err;
+        else {
+            res.send({ nutrition });
+        }
+      })
+}
+
 const get_nutrition = (req, res) => {
     Nutrition.find({ accountId: req.body.accountId, date: req.body.date }, function(err, data) {
         if(err) throw err;
@@ -29,4 +38,5 @@ const get_nutrition = (req, res) => {
 module.exports = {
     create_nutrition,
     get_nutrition,
+    update_nutrition,
 }
