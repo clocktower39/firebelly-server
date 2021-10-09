@@ -38,7 +38,7 @@ const trainingSchema = new mongoose.Schema(
           },
         ],
       ],
-      required: true, minimize: false
+      required: true, 
     },
   },
   { minimize: false }

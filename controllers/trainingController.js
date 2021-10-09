@@ -20,7 +20,7 @@ const create_training = (req, res) => {
 }
 
 const update_training = (req, res) => {
-    Training.findByIdAndUpdate(req.body._id, { training: req.body.training }, { new: true }, (err, training) => {
+    Training.findByIdAndUpdate(req.body._id, { ...req.body.training }, { new: true }, (err, training) => {
         if (err) throw err;
         else {
             res.send({ training });
