@@ -19,6 +19,15 @@ const create_training = (req, res) => {
     saveTraining();
 }
 
+const update_training = (req, res) => {
+    Training.findByIdAndUpdate(req.body._id, { training: req.body.training }, { new: true }, (err, training) => {
+        if (err) throw err;
+        else {
+            res.send({ training });
+        }
+    })
+}
+
 const get_training = (req, res) => {
     Training.find({ accountId: req.body.accountId, date: req.body.date }, function(err, data) {
         if(err) throw err;
@@ -29,4 +38,5 @@ const get_training = (req, res) => {
 module.exports = {
     create_training,
     get_training,
+    update_training,
 }
