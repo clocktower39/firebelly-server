@@ -31,7 +31,7 @@ const update_note = (req, res) => {
 const get_note = (req, res) => {
     Note.findOne({ accountId: req.body.accountId, date: req.body.date }, function(err, data) {
         if(err) throw err;
-        res.send(data);
+        res.send(data||{ results: "No Results"});
     });
 }
 
