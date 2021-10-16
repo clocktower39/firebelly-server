@@ -27,13 +27,13 @@ const trainingSchema = new mongoose.Schema(
           {
             exercise: "Unset",
             goals: {
-              sets: 0,
+              sets: 1,
               minReps: 0,
               maxReps: 0,
             },
             achieved: {
               sets: 0,
-              reps: [],
+              reps: [0],
             },
           },
         ],
