@@ -4,7 +4,7 @@ const trainingSchema = new mongoose.Schema(
   {
     date: { type: Date, required: true },
     accountId: { type: String, required: true },
-    category: { type: String, required: true },
+    category: { type: String },
     training: {
       type: [
         [
@@ -18,6 +18,7 @@ const trainingSchema = new mongoose.Schema(
             achieved: {
               sets: { type: Number },
               reps: { type: Array },
+              weight: { type: Array },
             },
           },
         ],
@@ -25,7 +26,7 @@ const trainingSchema = new mongoose.Schema(
       default: [
         [
           {
-            exercise: "Unset",
+            exercise: "",
             goals: {
               sets: 1,
               minReps: 0,
@@ -34,6 +35,7 @@ const trainingSchema = new mongoose.Schema(
             achieved: {
               sets: 0,
               reps: [0],
+              weight: [0],
             },
           },
         ],
