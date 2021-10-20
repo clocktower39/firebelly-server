@@ -37,7 +37,9 @@ const login_user = (req, res) => {
         }
         //if the password does not match and previous session was not authenticated, do not authenticate
         if (isMatch) {
-          const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET);
+          const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
+            expiresIn: '30d' // expires in 30 days
+          });
           res.send({
             accessToken: accessToken,
           });
@@ -51,6 +53,10 @@ const login_user = (req, res) => {
   });
 };
 
+const checkAuthLoginToken = (req, res) => {
+  res.send('Authorized')
+}
+
 const update_default_tasks = (req, res) => {
   User.findOneAndUpdate(
     { _id: req.body._id },
@@ -59,7 +65,9 @@ const update_default_tasks = (req, res) => {
     (err, user) => {
         if (err) throw err;
         else {
-            const accessToken = jwt.sign(JSON.stringify(user), ACCESS_TOKEN_SECRET);
+            const accessToken = jwt.sign(JSON.stringify(user), ACCESS_TOKEN_SECRET, {
+              expiresIn: '30d' // expires in 30 days
+            });
             res.send({ user, accessToken });
         }
       }
@@ -69,5 +77,6 @@ const update_default_tasks = (req, res) => {
 module.exports = {
   signup_user,
   login_user,
+  checkAuthLoginToken,
   update_default_tasks,
 };
