@@ -20,7 +20,7 @@ const create_nutrition = (req, res) => {
 }
 
 const update_nutrition = (req, res) => {
-    Nutrition.findByIdAndUpdate(req.body._id, { achieved: req.body.achieved }, { new: true}, (err, nutrition) => {
+    Nutrition.findByIdAndUpdate(req.body._id, { stats: { ...req.body.nutrition.stats } }, { new: true}, (err, nutrition) => {
         if (err) throw err;
         else {
             res.send({ nutrition });
