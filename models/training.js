@@ -10,6 +10,7 @@ const trainingSchema = new mongoose.Schema(
         [
           {
             exercise: { type: String },
+            exerciseType: { type: String },
             goals: {
               sets: { type: Number },
               minReps: { type: Array },
@@ -33,6 +34,7 @@ const trainingSchema = new mongoose.Schema(
         [
           {
             exercise: "",
+            exerciseType: "Rep Range",
             goals: {
               sets: 1,
               minReps: [0],
