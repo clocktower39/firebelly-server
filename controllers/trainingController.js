@@ -52,6 +52,16 @@ const get_weekly_training = (req, res) => {
         })
       }, function(err, data) {
         if(err) throw err;
+        week.forEach((date)=> {
+            let doesDateExist = false;
+            data.map(day => {
+                if(new Date(day.date).getTime() === new Date(date).getTime()) 
+                {
+                    doesDateExist = true;
+                }
+            })
+            if(!doesDateExist) data.push({ date: new Date(date), category: "", training: [] })
+        });
         res.send(data);
     });    
 
