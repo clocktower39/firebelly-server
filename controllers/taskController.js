@@ -20,7 +20,7 @@ const create_task = (req, res) => {
 }
 
 const update_task = (req, res) => {
-    Task.findByIdAndUpdate(req.body._id, { achieved: req.body.achieved }, { new: true}, (err, task) => {
+    Task.findOneAndReplace({ _id: req.body._id}, { ...req.body.newDailyTask }, { new: true}, (err, task) => {
         if (err) throw err;
         else {
             res.send({ task });
