@@ -1,7 +1,10 @@
 const Note = require('../models/note');
 
 const create_note = (req, res) => {
-    let note = new Note(req.body);
+    let note = new Note({
+        ...req.body,
+        accountId: res.locals.user._id,
+    });
     let saveNote = () => {
         note.save((err) => {
             if (err) {
@@ -29,7 +32,7 @@ const update_note = (req, res) => {
 }
 
 const get_note = (req, res) => {
-    Note.findOne({ accountId: req.body.accountId, date: req.body.date }, function(err, data) {
+    Note.findOne({ accountId: res.locals.user._id, date: req.body.date }, function(err, data) {
         if(err) throw err;
         res.send(data||{ results: "No Results"});
     });

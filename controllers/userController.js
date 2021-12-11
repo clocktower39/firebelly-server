@@ -59,7 +59,7 @@ const checkAuthLoginToken = (req, res) => {
 
 const update_default_tasks = (req, res) => {
   User.findOneAndUpdate(
-    { _id: req.body._id },
+    { _id: res.locals.user._id },
     { defaultTasks: req.body.defaultTasks },
     { new: true },    
     (err, user) => {

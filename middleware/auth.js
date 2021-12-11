@@ -9,7 +9,7 @@ const verifyToken = (req, res, next) => {
   if(token === null) return res.status(401).send("A token is required for authentication");
   jwt.verify(token, ACCESS_TOKEN_SECRET, (err, user) => {
       if(err) return res.sendStatus(403);
-      req.user = user;
+      res.locals.user = user;
       next();
   });
 };

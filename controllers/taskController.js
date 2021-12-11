@@ -1,7 +1,10 @@
 const Task = require('../models/task');
 
 const create_task = (req, res) => {
-    let task = new Task(req.body);
+    let task = new Task({
+        ...req.body,
+        accountId: res.locals.user._id,
+    });
     let saveTask = () => {
         task.save((err) => {
             if (err) {
@@ -29,7 +32,7 @@ const update_task = (req, res) => {
 }
 
 const get_tasks = (req, res) => {
-    Task.find({ accountId: req.body.accountId, date: req.body.date }, function(err, data) {
+    Task.find({ accountId: res.locals.user._id, date: req.body.date }, function(err, data) {
         if(err) throw err;
         res.send(data);
     });

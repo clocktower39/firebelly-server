@@ -1,7 +1,10 @@
 const Nutrition = require('../models/nutrition');
 
 const create_nutrition = (req, res) => {
-    let nutrition = new Nutrition(req.body);
+    let nutrition = new Nutrition({
+        ...req.body,
+        accountId: res.locals.user._id,
+    });
     let saveNutrition = () => {
         nutrition.save((err) => {
             if (err) {
@@ -29,7 +32,7 @@ const update_nutrition = (req, res) => {
 }
 
 const get_nutrition = (req, res) => {
-    Nutrition.find({ accountId: req.body.accountId, date: new Date(req.body.date) }, function(err, data) {
+    Nutrition.find({ accountId: res.locals.user._id, date: new Date(req.body.date) }, function(err, data) {
         if(err) throw err;
         res.send(data);
     });
@@ -48,7 +51,7 @@ const get_weekly_nutrition = (req, res) => {
 
     Nutrition.find({
         $or: week.map(day=> {
-            return {'date': day};
+            return {date: day};
         })
       }, function(err, data) {
         if(err) throw err;

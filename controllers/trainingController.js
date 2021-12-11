@@ -1,7 +1,10 @@
 const Training = require('../models/training');
 
 const create_training = (req, res) => {
-    let training = new Training(req.body);
+    let training = new Training({
+        ...req.body,
+        accountId: res.locals.user._id,
+    });
     let saveTraining = () => {
         training.save((err) => {
             if (err) {
@@ -29,7 +32,7 @@ const update_training = (req, res) => {
 }
 
 const get_training = (req, res) => {
-    Training.find({ accountId: req.body.accountId, date: req.body.date }, function(err, data) {
+    Training.find({ accountId: res.locals.user._id, date: req.body.date }, function(err, data) {
         if(err) throw err;
         res.send(data);
     });
@@ -48,7 +51,7 @@ const get_weekly_training = (req, res) => {
 
     Training.find({
         $or: week.map(day=> {
-            return {'date': day};
+            return {date: day, accountId: res.locals.user._id};
         })
       }, function(err, data) {
         if(err) throw err;
