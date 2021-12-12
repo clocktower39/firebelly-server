@@ -34,7 +34,7 @@ const trainingSchema = new mongoose.Schema(
         [
           {
             exercise: "",
-            exerciseType: "Rep Range",
+            exerciseType: "Reps",
             goals: {
               sets: 1,
               minReps: [0],
