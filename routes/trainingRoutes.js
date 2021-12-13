@@ -8,5 +8,7 @@ router.post('/training', auth, trainingController.get_training);
 router.post('/updateTraining', auth, trainingController.update_training);
 router.post('/createTraining', auth, trainingController.create_training);
 router.post('/trainingWeek', auth, trainingController.get_weekly_training);
+router.post('/exerciseHistory', auth, trainingController.get_exercise_history);
+router.get('/exerciseList', auth, trainingController.get_exercise_list);
 
 module.exports = router;

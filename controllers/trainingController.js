@@ -70,9 +70,46 @@ const get_weekly_training = (req, res) => {
 
 }
 
+const get_exercise_list = (req, res) => {
+    Training.find({ accountId: res.locals.user._id }, function(err, data) {
+        if(err) throw err;
+
+        let exerciseList = [];
+        
+        data.map(day => {
+            day.training.map(set => {
+                set.map(exercise => {
+                    if(!exerciseList.map(ex => ex.toLowerCase()).includes(exercise.exercise.toLowerCase())){
+                        exerciseList.push(exercise.exercise);
+                    }
+                });
+            });
+        });
+        res.send(exerciseList);
+    });
+}
+
+const get_exercise_history = (req, res) => {
+    Training.find({ accountId: res.locals.user._id }, function(err, data) {
+        if(err) throw err;
+
+        let historyList = [];
+        
+        data.map(day => {
+            day.training.map(set => {
+                let targetedExercise = set.filter(exercise => exercise.exercise.toLowerCase() === req.body.targetExercise.toLowerCase())
+                historyList.push(...targetedExercise)
+            })
+        })
+        res.send(historyList);
+    });    
+}
+
 module.exports = {
     create_training,
     get_training,
     update_training,
     get_weekly_training,
+    get_exercise_list,
+    get_exercise_history,
 }
