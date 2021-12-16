@@ -98,11 +98,13 @@ const get_exercise_history = (req, res) => {
         data.map(day => {
             day.training.map(set => {
                 let targetedExercise = set.filter(exercise => exercise.exercise.toLowerCase() === req.body.targetExercise.toLowerCase())
-                historyList.push(...targetedExercise)
+                if(targetedExercise.length > 0){
+                    historyList.push({ ...targetedExercise[0], date: day.date })
+                }
             })
         })
         res.send(historyList);
-    });    
+    }).lean().exec();    
 }
 
 module.exports = {
