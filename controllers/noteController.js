@@ -3,6 +3,7 @@ const Note = require('../models/note');
 const create_note = (req, res) => {
     let note = new Note({
         ...req.body,
+        date: new Date(),
         accountId: res.locals.user._id,
     });
     let saveNote = () => {
@@ -31,8 +32,8 @@ const update_note = (req, res) => {
     })
 }
 
-const get_note = (req, res) => {
-    Note.findOne({ accountId: res.locals.user._id, date: req.body.date }, function(err, data) {
+const get_notes = (req, res) => {
+    Note.find({ accountId: res.locals.user._id }, function(err, data) {
         if(err) throw err;
         res.send(data||{ results: "No Results"});
     });
@@ -41,5 +42,5 @@ const get_note = (req, res) => {
 module.exports = {
     create_note,
     update_note,
-    get_note,
+    get_notes,
 }
