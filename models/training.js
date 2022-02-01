@@ -4,7 +4,7 @@ const trainingSchema = new mongoose.Schema(
   {
     date: { type: Date, required: true },
     accountId: { type: String, required: true },
-    category: { type: String },
+    category: { type: Array, required: true },
     training: {
       type: [
         [

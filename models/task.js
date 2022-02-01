@@ -16,6 +16,27 @@ const taskSchema = new mongoose.Schema({
         ],
         required: true,
     }
+    // history: {
+    //     type: [
+    //         {
+    //             date: { type: String, required: true, index: { unique: true } },
+    //             tasks: {
+    //                 type: [
+    //                     {
+    //                         title: { type: String },
+    //                         goal: { type: Number },
+    //                         achieved: { type: Number },
+    //                     }
+    //                 ]
+    //             }
+    //         },
+    //     ],
+    //     default: [],
+    //     required: true
+    // },
+    // defaultTasks: {
+    //     type: []
+    // },
 })
 
 const Task = mongoose.model('Task', taskSchema);
