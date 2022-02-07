@@ -4,8 +4,6 @@ const auth = require("../middleware/auth");
 
 const router = express.Router();
 
-router.post('/tasks', auth, taskController.get_tasks);
-router.post('/createTask', auth, taskController.create_task);
-router.post('/updateTask', auth, taskController.update_task);
+router.get('/tasks', auth, taskController.get_tasks);
 
 module.exports = router;
