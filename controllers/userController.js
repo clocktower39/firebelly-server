@@ -1,4 +1,5 @@
 const User = require("../models/user");
+const mongoose = require('mongoose');
 const jwt = require("jsonwebtoken");
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
@@ -38,7 +39,7 @@ const login_user = (req, res) => {
         //if the password does not match and previous session was not authenticated, do not authenticate
         if (isMatch) {
           const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
-            expiresIn: '30d' // expires in 30 days
+            expiresIn: "30d", // expires in 30 days
           });
           res.send({
             accessToken: accessToken,
@@ -54,24 +55,40 @@ const login_user = (req, res) => {
 };
 
 const checkAuthLoginToken = (req, res) => {
-  res.send('Authorized')
-}
+  res.send("Authorized");
+};
 
 const update_default_tasks = (req, res) => {
   User.findOneAndUpdate(
     { _id: res.locals.user._id },
     { defaultTasks: req.body.defaultTasks },
-    { new: true },    
+    { new: true },
     (err, user) => {
-        if (err) throw err;
-        else {
-            const accessToken = jwt.sign(JSON.stringify(user), ACCESS_TOKEN_SECRET, {
-              expiresIn: '30d' // expires in 30 days
-            });
-            res.send({ user, accessToken });
-        }
+      if (err) throw err;
+      else {
+        const accessToken = jwt.sign(JSON.stringify(user), ACCESS_TOKEN_SECRET, {
+          expiresIn: "30d", // expires in 30 days
+        });
+        res.send({ user, accessToken });
       }
+    }
   );
+};
+
+const get_userInfo = (req, res) => {
+  User.findOne({ _id: req.body._id }, function (err, user) {
+    if (err) throw err;
+    if (!user) {
+      res.send({
+        error: { email: "User not found" },
+      });
+    } else {
+      res.send({
+        firstName: user.firstName,
+        lastName: user.lastName,
+      });
+    }
+  });
 };
 
 module.exports = {
@@ -79,4 +96,5 @@ module.exports = {
   login_user,
   checkAuthLoginToken,
   update_default_tasks,
+  get_userInfo,
 };

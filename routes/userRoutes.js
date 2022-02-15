@@ -8,5 +8,6 @@ router.get('/checkAuthToken', auth, userController.checkAuthLoginToken);
 router.post('/login', userController.login_user);
 router.post('/signup', userController.signup_user);
 router.post('/updateDefaultTasks', auth, userController.update_default_tasks);
+router.post('/getUser', userController.get_userInfo);
 
 module.exports = router;
