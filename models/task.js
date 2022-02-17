@@ -5,7 +5,7 @@ const taskSchema = new mongoose.Schema({
     history: {
         type: [
             {
-                date: { type: String, required: true, index: { unique: true } },
+                date: { type: Date, required: true, index: { unique: true } },
                 tasks: {
                     type: [
                         {
