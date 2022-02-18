@@ -5,6 +5,8 @@ const create_note = (req, res) => {
         ...req.body,
         date: new Date(),
         accountId: res.locals.user._id,
+        firstName: res.locals.user.firstName,
+        lastName: res.locals.user.lastName,
     });
     let saveNote = () => {
         note.save((err) => {

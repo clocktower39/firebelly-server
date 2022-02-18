@@ -1,5 +1,5 @@
 const User = require("../models/user");
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
@@ -76,19 +76,25 @@ const update_default_tasks = (req, res) => {
 };
 
 const get_userInfo = (req, res) => {
-  User.findOne({ _id: req.body._id }, function (err, user) {
-    if (err) throw err;
-    if (!user) {
-      res.send({
-        error: { email: "User not found" },
-      });
-    } else {
-      res.send({
-        firstName: user.firstName,
-        lastName: user.lastName,
-      });
-    }
-  });
+  console.log(req.body)
+  if (req.body._id.length === 24) {
+    User.findById({ _id: req.body._id }, function (err, user) {
+      if (err) throw err;
+      if (!user) {
+        res.send({
+          error: "User not found",
+        });
+      } else {
+        console.log(user.firstName)
+        res.send({
+          firstName: user.firstName,
+          lastName: user.lastName,
+        });
+      }
+    });
+  } else {
+    res.send({ error: "ID not valid"});
+  }
 };
 
 module.exports = {
