@@ -58,25 +58,8 @@ const checkAuthLoginToken = (req, res) => {
   res.send("Authorized");
 };
 
-const update_default_tasks = (req, res) => {
-  User.findOneAndUpdate(
-    { _id: res.locals.user._id },
-    { defaultTasks: req.body.defaultTasks },
-    { new: true },
-    (err, user) => {
-      if (err) throw err;
-      else {
-        const accessToken = jwt.sign(JSON.stringify(user), ACCESS_TOKEN_SECRET, {
-          expiresIn: "30d", // expires in 30 days
-        });
-        res.send({ user, accessToken });
-      }
-    }
-  );
-};
 
 const get_userInfo = (req, res) => {
-  console.log(req.body)
   if (req.body._id.length === 24) {
     User.findById({ _id: req.body._id }, function (err, user) {
       if (err) throw err;
@@ -101,6 +84,5 @@ module.exports = {
   signup_user,
   login_user,
   checkAuthLoginToken,
-  update_default_tasks,
   get_userInfo,
 };
