@@ -8,7 +8,6 @@ const signup_user = (req, res) => {
   let saveUser = () => {
     user.save((err) => {
       if (err) {
-        console.log(err);
         res.send({ error: { err } });
       } else {
         res.send({
@@ -54,6 +53,23 @@ const login_user = (req, res) => {
   });
 };
 
+const update_user = (req, res) => {
+  User.findByIdAndUpdate(res.locals.user._id, { ...req.body } , {new: true}, function (err, user) {
+    if (err || !user) {
+      res.send({
+        status: 'error',
+        err: err?err:'',
+      })
+    }
+    else {
+      const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
+        expiresIn: "30d", // expires in 30 days
+      });
+        res.send({status: 'Successful', accessToken});
+    }
+  })
+}
+
 const checkAuthLoginToken = (req, res) => {
   res.send("Authorized");
 };
@@ -68,7 +84,6 @@ const get_userInfo = (req, res) => {
           error: "User not found",
         });
       } else {
-        console.log(user.firstName)
         res.send({
           firstName: user.firstName,
           lastName: user.lastName,
@@ -83,6 +98,7 @@ const get_userInfo = (req, res) => {
 module.exports = {
   signup_user,
   login_user,
+  update_user,
   checkAuthLoginToken,
   get_userInfo,
 };
