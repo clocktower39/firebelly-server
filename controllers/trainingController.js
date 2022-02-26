@@ -107,6 +107,22 @@ const get_exercise_history = (req, res) => {
     }).lean().exec();    
 }
 
+const update_workout_date = (req, res) => {
+    Training.find({ accountId: res.locals.user._id, date: req.body.newDate }, function(err, newDateData) {
+        if(err) throw err;
+        if(newDateData.length > 0){
+            res.send({error: `Workout already exists for ${req.body.newDate}`})
+        }
+        else {
+            Training.findOneAndUpdate({ accountId: res.locals.user._id, date: req.body.originalDate }, { date: req.body.newDate }, {new: true}, function(err, data) {
+                if(err) throw err;
+                
+                res.send(data);
+            }) 
+        }
+    }) 
+}
+
 module.exports = {
     create_training,
     get_training,
@@ -114,4 +130,5 @@ module.exports = {
     get_weekly_training,
     get_exercise_list,
     get_exercise_history,
+    update_workout_date,
 }
