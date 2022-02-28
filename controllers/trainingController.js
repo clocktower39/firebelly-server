@@ -123,6 +123,17 @@ const update_workout_date = (req, res) => {
     }) 
 }
 
+const delete_workout_date = (req, res) => {
+    Training.findOneAndDelete({ accountId: res.locals.user._id, date: req.body.date }, function(err, data) {
+        if(err) {
+            res.send({error: err})
+        }
+        else {
+            res.send({status: 'Record deleted'})
+        }
+    }) 
+}
+
 module.exports = {
     create_training,
     get_training,
@@ -131,4 +142,5 @@ module.exports = {
     get_exercise_list,
     get_exercise_history,
     update_workout_date,
+    delete_workout_date,
 }

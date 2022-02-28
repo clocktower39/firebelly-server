@@ -11,5 +11,6 @@ router.post('/trainingWeek', auth, trainingController.get_weekly_training);
 router.post('/exerciseHistory', auth, trainingController.get_exercise_history);
 router.get('/exerciseList', auth, trainingController.get_exercise_list);
 router.post('/updateWorkoutDate', auth, trainingController.update_workout_date);
+router.post('/deleteWorkoutDate', auth, trainingController.delete_workout_date);
 
 module.exports = router;
