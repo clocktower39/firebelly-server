@@ -53,6 +53,38 @@ const login_user = (req, res) => {
   });
 };
 
+const change_password = (req, res) => {
+  User.findOne({ email: res.locals.user.email }, function (err, user) {
+    if (err) throw err;
+    if (!user) {
+      res.send({
+        error: { status: "User not found" },
+      });
+    } else {
+      user.comparePassword(req.body.currentPassword, function (err, isMatch) {
+        if (err) {
+          res.send({
+            error: { status: 'Incorrect Current Password'},
+          });
+        }
+        if (isMatch) {
+          user.password = req.body.newPassword;
+          user.save().then(savedUser => {
+            const accessToken = jwt.sign(savedUser._doc, ACCESS_TOKEN_SECRET, {
+              expiresIn: "30d", // expires in 30 days
+            });
+            res.send({accessToken});
+          })
+        } else {
+          res.send({
+            error: { status: "Password change failed." },
+          });
+        }
+      });
+    }
+  });
+};
+
 const update_user = (req, res) => {
   User.findByIdAndUpdate(res.locals.user._id, { ...req.body } , {new: true}, function (err, user) {
     if (err || !user) {
@@ -101,4 +133,5 @@ module.exports = {
   update_user,
   checkAuthLoginToken,
   get_userInfo,
+  change_password,
 };
