@@ -79,7 +79,7 @@ const get_exercise_list = (req, res) => {
         data.map(day => {
             day.training.map(set => {
                 set.map(exercise => {
-                    if(!exerciseList.map(ex => ex.toLowerCase()).includes(exercise.exercise.toLowerCase())){
+                    if(!exerciseList.map(ex => (typeof ex === 'string') ? ex.toLowerCase():ex).includes((typeof exercise.exercise === 'string') ? exercise.exercise.toLowerCase():'')){
                         exerciseList.push(exercise.exercise);
                     }
                 });
