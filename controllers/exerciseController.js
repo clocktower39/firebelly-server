@@ -1,29 +1,24 @@
 const Exercise = require('../models/exercise');
 
-const create_exercise = (req, res) => {
+const create_exercise = (req, res, next) => {
     let exercise = new Exercise({
         ...req.body,
     });
     let saveExercise = () => {
         exercise.save((err) => {
-            if (err) {
-                console.log(err);
-                res.send({ error: { err } });
-            }
-            else {
-                res.send({
-                    status: 'success',
-                    exercise
-                })
-            }
+            if (err) return next(err);
+            res.send({
+                status: 'success',
+                exercise
+            })
         });
     }
     saveExercise();
 }
 
-const get_exercise_library = (req, res) => {
-    Exercise.find({}, function(err, data) {
-        if(err) throw err;
+const get_exercise_library = (req, res, next) => {
+    Exercise.find({}, function (err, data) {
+        if (err) return next(err);
         res.send(data);
     });
 }

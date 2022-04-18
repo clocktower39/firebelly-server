@@ -3,26 +3,23 @@ const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
-const signup_user = (req, res) => {
+const signup_user = (req, res, next) => {
   let user = new User(req.body);
   let saveUser = () => {
     user.save((err) => {
-      if (err) {
-        res.send({ error: { err } });
-      } else {
-        res.send({
-          status: "success",
-          user,
-        });
-      }
+      if (err) return next(err);
+      res.send({
+        status: "success",
+        user,
+      });
     });
   };
   saveUser();
 };
 
-const login_user = (req, res) => {
+const login_user = (req, res, next) => {
   User.findOne({ email: req.body.email }, function (err, user) {
-    if (err) throw err;
+    if (err) return next(err);
     if (!user) {
       res.send({
         authenticated: false,
@@ -53,9 +50,9 @@ const login_user = (req, res) => {
   });
 };
 
-const change_password = (req, res) => {
+const change_password = (req, res, next) => {
   User.findOne({ email: res.locals.user.email }, function (err, user) {
-    if (err) throw err;
+    if (err) return next(err);
     if (!user) {
       res.send({
         error: { status: "User not found" },
@@ -64,7 +61,7 @@ const change_password = (req, res) => {
       user.comparePassword(req.body.currentPassword, function (err, isMatch) {
         if (err) {
           res.send({
-            error: { status: 'Incorrect Current Password'},
+            error: { status: 'Incorrect Current Password' },
           });
         }
         if (isMatch) {
@@ -73,7 +70,7 @@ const change_password = (req, res) => {
             const accessToken = jwt.sign(savedUser._doc, ACCESS_TOKEN_SECRET, {
               expiresIn: "30d", // expires in 30 days
             });
-            res.send({accessToken});
+            res.send({ accessToken });
           })
         } else {
           res.send({
@@ -85,32 +82,33 @@ const change_password = (req, res) => {
   });
 };
 
-const update_user = (req, res) => {
-  User.findByIdAndUpdate(res.locals.user._id, { ...req.body } , {new: true}, function (err, user) {
-    if (err || !user) {
+const update_user = (req, res, next) => {
+  User.findByIdAndUpdate(res.locals.user._id, { ...req.body }, { new: true }, function (err, user) {
+    if (err) return next(err);
+    if (!user) {
       res.send({
         status: 'error',
-        err: err?err:'',
+        err: err ? err : '',
       })
     }
     else {
       const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
         expiresIn: "30d", // expires in 30 days
       });
-        res.send({status: 'Successful', accessToken});
+      res.send({ status: 'Successful', accessToken });
     }
   })
 }
 
-const checkAuthLoginToken = (req, res) => {
+const checkAuthLoginToken = (req, res, next) => {
   res.send("Authorized");
 };
 
 
-const get_userInfo = (req, res) => {
+const get_userInfo = (req, res, next) => {
   if (req.body._id.length === 24) {
     User.findById({ _id: req.body._id }, function (err, user) {
-      if (err) throw err;
+      if (err) return next(err);
       if (!user) {
         res.send({
           error: "User not found",
@@ -123,7 +121,7 @@ const get_userInfo = (req, res) => {
       }
     });
   } else {
-    res.send({ error: "ID not valid"});
+    res.send({ error: "ID not valid" });
   }
 };
 

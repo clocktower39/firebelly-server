@@ -1,6 +1,6 @@
 const Note = require('../models/note');
 
-const create_note = (req, res) => {
+const create_note = (req, res, next) => {
     let note = new Note({
         ...req.body,
         date: new Date(),
@@ -10,34 +10,29 @@ const create_note = (req, res) => {
     });
     let saveNote = () => {
         note.save((err) => {
-            if (err) {
-                console.log(err);
-                res.send({ error: { err } });
-            }
-            else {
-                res.send({
-                    status: 'success',
-                    note
-                })
-            }
+            if (err) return next(err);
+            res.send({
+                status: 'success',
+                note
+            })
         });
     }
     saveNote();
 }
 
-const update_note = (req, res) => {
-    Note.findByIdAndUpdate(req.body._id, { note: req.body.note }, { new: true}, (err, note) => {
-        if (err) throw err;
+const update_note = (req, res, next) => {
+    Note.findByIdAndUpdate(req.body._id, { note: req.body.note }, { new: true }, (err, note) => {
+        if (err) return next(err);
         else {
             res.send({ note });
         }
     })
 }
 
-const get_notes = (req, res) => {
-    Note.find({ accountId: res.locals.user._id }, function(err, data) {
-        if(err) throw err;
-        res.send(data||{ results: "No Results"});
+const get_notes = (req, res, next) => {
+    Note.find({ accountId: res.locals.user._id }, function (err, data) {
+        if (err) return next(err);
+        res.send(data || { results: "No Results" });
     });
 }
 

@@ -45,6 +45,12 @@ mongoose.connect(dbUrl,
     console.log('mongo db connection', err)
 })
 
+// Error handling Function
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send(err.stack);
+})
+
 let server = http.listen(PORT, ()=> {
     console.log(`Server is listening on port ${PORT}`);
 });
