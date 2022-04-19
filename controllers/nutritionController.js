@@ -27,7 +27,9 @@ const update_nutrition = (req, res, next) => {
 }
 
 const get_nutrition = (req, res, next) => {
-    Nutrition.find({ accountId: res.locals.user._id, date: new Date(req.body.date) }, function (err, data) {
+    const { date } = req.body;
+    if(!date) return res.send({status: 'Date required'});
+    Nutrition.find({ accountId: res.locals.user._id, date: new Date(date) }, function (err, data) {
         if (err) return next(err);
         res.send(data);
     });
