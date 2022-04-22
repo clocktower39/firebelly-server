@@ -5,6 +5,7 @@ const http = require('http').Server(app);
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const { ValidationError } = require('express-validation');
 const cors = require('cors');
 const userRoutes = require('./routes/userRoutes');
 const exerciseRoutes = require('./routes/exerciseRoutes');
@@ -47,6 +48,9 @@ mongoose.connect(dbUrl,
 
 // Error handling Function
 app.use((err, req, res, next) => {
+    if (err instanceof ValidationError) {
+      return res.status(err.statusCode).json(err)
+    }
     console.error(err.stack);
     res.status(500).send(err.stack);
 })
