@@ -92,6 +92,9 @@ const update_user = (req, res, next) => {
       })
     }
     else {
+      console.log({...req.body})
+      console.log(user)
+      console.log(user._doc)
       const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
         expiresIn: "30d", // expires in 30 days
       });

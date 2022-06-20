@@ -12,6 +12,7 @@ const UserSchema = new mongoose.Schema({
     dateOfBirth: { type: Date },
     height: { type: String },
     sex: { type: String, },
+    themeMode: { type: String, required: true, default: 'light', },
 }, { minimize: false })
 
 UserSchema.pre('save', function(next) {
