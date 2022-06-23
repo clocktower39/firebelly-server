@@ -20,6 +20,7 @@ const relationshipValidate = {
 const router = express.Router();
 
 router.get('/relationships/:type/:_id', auth, relationshipController.get_relationships);
+router.get('/relationships/myTrainers', auth, relationshipController.get_my_relationships);
 router.post('/manageRelationship', validate(relationshipValidate, {}, {}), auth, relationshipController.manage_relationship);
 
 module.exports = router;
