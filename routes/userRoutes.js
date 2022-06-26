@@ -29,6 +29,7 @@ const signupValidate = {
 }
 
 router.get('/checkAuthToken', auth, userController.checkAuthLoginToken);
+router.get('/trainers', auth, userController.get_trainers);
 router.post('/login', validate(loginValidate, {}, {}), userController.login_user);
 router.post('/signup', validate(signupValidate, {}, {}),userController.signup_user);
 router.post('/updateUser', auth, userController.update_user);

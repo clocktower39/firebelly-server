@@ -92,7 +92,7 @@ const update_user = (req, res, next) => {
       })
     }
     else {
-      console.log({...req.body})
+      console.log({ ...req.body })
       console.log(user)
       console.log(user._doc)
       const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
@@ -128,6 +128,19 @@ const get_userInfo = (req, res, next) => {
   }
 };
 
+const get_trainers = (req, res, next) => {
+  User.find({ isTrainer: true }, function (err, trainers) {
+    if (err) return next(err);
+    const publicTrainers = trainers.map(trainer => ({
+      trainerId: trainer._id,
+      firstName: trainer.firstName,
+      lastName: trainer.lastName,
+      sex: trainer.sex,
+    }))
+    res.send(publicTrainers);
+  });
+};
+
 module.exports = {
   signup_user,
   login_user,
@@ -135,4 +148,5 @@ module.exports = {
   checkAuthLoginToken,
   get_userInfo,
   change_password,
+  get_trainers,
 };

@@ -71,7 +71,7 @@ const get_my_relationships = async (req, res, next) => {
         return {
             firstName: t.firstName,
             lastName: t.lastName,
-            _id: t._id,
+            trainerId: t._id,
             accepted,
         }
     })
