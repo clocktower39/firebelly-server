@@ -14,6 +14,7 @@ const nutritionRoutes = require('./routes/nutritionRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const relationshipRoutes = require('./routes/relationshipRoutes');
+const goalRoutes = require('./routes/goalRoutes');
 
 // require('dotenv').config();
 const dbUrl = process.env.DBURL;
@@ -37,6 +38,7 @@ app.use('/', nutritionRoutes);
 app.use('/', taskRoutes);
 app.use('/', noteRoutes);
 app.use('/', relationshipRoutes);
+app.use('/', goalRoutes);
 
 mongoose.connect(dbUrl, 
     {
