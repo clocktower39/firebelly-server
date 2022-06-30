@@ -18,11 +18,11 @@ const create_goal = (req, res, next) => {
 }
 
 const update_goal = (req, res, next) => {
-    const { title, description, achievedDate, } = req.body;
-    Goal.findByIdAndUpdate(req.body._id, { title, description, achievedDate, }, { new: true }, (err, goal) => {
+    const { title, description, achievedDate, targetDate } = req.body;
+    Goal.findByIdAndUpdate(req.body._id, { title, description, achievedDate, targetDate }, { new: true }, (err, goal) => {
         if (err) return next(err);
         else {
-            res.send({ goal });
+            res.send(goal);
         }
     })
 }
@@ -41,9 +41,7 @@ const comment_on_goal = (req, res, next) => {
             let saveGoal = () => {
                 goal.save((err) => {
                     if (err) return next(err);
-                    res.send({
-                        goal
-                    })
+                    res.send(goal)
                 });
             }
             saveGoal();
