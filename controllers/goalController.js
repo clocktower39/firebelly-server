@@ -9,12 +9,21 @@ const create_goal = (req, res, next) => {
     let saveGoal = () => {
         goal.save((err) => {
             if (err) return next(err);
-            res.send({
-                goal
-            })
+            res.send(goal)
         });
     }
     saveGoal();
+}
+
+const remove_goal = (req, res, next) => {
+    Goal.findOneAndDelete({ accountId: res.locals.user._id, _id: req.body.goalId }, function (err, data) {
+        if (err) {
+            res.send({ error: err })
+        }
+        else {
+            res.send({ status: 'Record deleted' })
+        }
+    })
 }
 
 const update_goal = (req, res, next) => {
@@ -58,6 +67,7 @@ const get_goals = (req, res, next) => {
 
 module.exports = {
     create_goal,
+    remove_goal,
     update_goal,
     get_goals,
     comment_on_goal,
