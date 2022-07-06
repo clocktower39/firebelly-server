@@ -43,13 +43,13 @@ const manage_relationship = (req, res, next) => {
 
 const get_relationships = (req, res, next) => {
     if (req.params.type === 'trainer') {
-        Relationship.find({ trainerId: req.params._id }, function (err, data) {
+        Relationship.find({ trainerId: req.params._id, clientId: res.locals.user._id }, function (err, data) {
             if (err) return next(err);
             res.send(data)
         });
     }
     else if (req.params.type === 'client') {
-        Relationship.find({ clientId: req.params._id }, function (err, data) {
+        Relationship.find({ clientId: req.params._id, trainerId: res.locals.user._id }, function (err, data) {
             if (err) return next(err);
             res.send(data)
         });
@@ -78,8 +78,27 @@ const get_my_relationships = async (req, res, next) => {
     res.send(trainerInfo)
 }
 
+const get_my_clients = async (req, res, next) => {
+    const relationships = await Relationship.find({ trainerId: res.locals.user._id }).lean().exec();
+
+    const promises = relationships.map(r => User.findById({ _id: r.clientId }).lean().exec());
+    const clients = await Promise.all(promises);
+
+    const clientInfo = clients.map(c => {
+        const accepted = relationships.filter(r => r.clientId.toString() === c._id.toString())[0].accepted;
+        return {
+            firstName: c.firstName,
+            lastName: c.lastName,
+            clientId: c._id,
+            accepted,
+        }
+    })
+    res.send(clientInfo)
+}
+
 module.exports = {
     manage_relationship,
     get_relationships,
     get_my_relationships,
+    get_my_clients,
 }

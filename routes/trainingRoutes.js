@@ -5,6 +5,7 @@ const auth = require("../middleware/auth");
 const router = express.Router();
 
 router.post('/training', auth, trainingController.get_training);
+router.post('/getClientTraining', auth, trainingController.get_client_training);
 router.post('/updateTraining', auth, trainingController.update_training);
 router.post('/createTraining', auth, trainingController.create_training);
 router.post('/trainingWeek', auth, trainingController.get_weekly_training);

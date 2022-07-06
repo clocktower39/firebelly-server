@@ -1,4 +1,5 @@
 const Training = require('../models/training');
+const Relationship = require('../models/relationship');
 
 const create_training = (req, res, next) => {
     let training = new Training({
@@ -31,6 +32,26 @@ const get_training = (req, res, next) => {
         if (err) return next(err);
         res.send(data);
     });
+}
+
+const get_client_training = (req, res, next) => {
+    Relationship.findOne({ trainerId: res.locals.user._id, clientId: req.body.clientId }, (err, relationship) => {
+        if (err) return next(err);
+        
+        if(!relationship){
+            res.send({ error: 'Relationship does not exist.'});
+        }
+        else if(relationship.accepted){
+            Training.find({ accountId: req.body.clientId, date: req.body.date }, function (err, data) {
+                if (err) return next(err);
+                res.send(data);
+            });
+        }
+        else{
+            res.send({ error: 'Relationship pending.'});
+        }
+    })
+
 }
 
 const get_weekly_training = (req, res, next) => {
@@ -137,4 +158,5 @@ module.exports = {
     get_exercise_history,
     update_workout_date,
     delete_workout_date,
+    get_client_training,
 }
