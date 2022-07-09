@@ -4,27 +4,30 @@ const userController = require('./userController');
 const mongoose = require('mongoose');
 
 const manage_relationship = (req, res, next) => {
-    if (!mongoose.Types.ObjectId.isValid(req.body.trainerId) || !mongoose.Types.ObjectId.isValid(req.body.clientId)) {
+    req.body.clientId = res.locals.user._id;
+    req.body.accepted = false;
+    req.body.requestedBy = 'client';
+    if (!mongoose.Types.ObjectId.isValid(req.body.trainerId)) {
         res.send('Invalid ID entered');
     }
     else {
         User.findById(req.body.trainerId, function (err, data) {
             if (err) return next(err);
             if (data === null || data.isTrainer === false) {
-                res.send('Trainer does not exist');
+                res.send({status: 'error', error: 'Trainer does not exist',});
             }
             else {
                 User.findById(req.body.clientId, function (err, data) {
                     if (err) throw err;
                     if (data === null) {
-                        res.send('Client does not exist');
+                        res.send({status: 'error', error: 'Client does not exist'});
                     }
                     else {
                         let relationship = new Relationship(req.body);
                         relationship.save((err) => {
                             if (err) {
                                 console.log(err);
-                                res.send({ error: { err } });
+                                res.send({ error: { err }, status: 'error', });
                             }
                             else {
                                 res.send({

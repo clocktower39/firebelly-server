@@ -7,12 +7,6 @@ const relationshipValidate = {
     body: Joi.object({
         trainerId: Joi.string()
             .required(),
-        clientId: Joi.string()
-            .required(),
-        requestedBy: Joi.string()
-            .required(),
-        accepted: Joi.boolean()
-            .required(),
     }),
 }
 
