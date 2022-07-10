@@ -99,9 +99,22 @@ const get_my_clients = async (req, res, next) => {
     res.send(clientInfo)
 }
 
+const remove_relationship = (req, res, next) => {
+    const { trainerId } = req.body;
+    Relationship.findOneAndDelete({ clientId: res.locals.user._id, trainerId, }, function (err, data) {
+        if (err) {
+            res.send({ error: err })
+        }
+        else {
+            res.sendStatus(200);
+        }
+    })
+}
+
 module.exports = {
     manage_relationship,
     get_relationships,
     get_my_relationships,
     get_my_clients,
+    remove_relationship,
 }

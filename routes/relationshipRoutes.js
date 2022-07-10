@@ -17,5 +17,6 @@ router.get('/relationships/:type/:_id', auth, relationshipController.get_relatio
 router.get('/relationships/myTrainers', auth, relationshipController.get_my_relationships);
 router.get('/relationships/myClients', auth, relationshipController.get_my_clients);
 router.post('/manageRelationship', validate(relationshipValidate, {}, {}), auth, relationshipController.manage_relationship);
+router.post('/removeRelationship', validate(relationshipValidate, {}, {}), auth, relationshipController.remove_relationship);
 
 module.exports = router;
