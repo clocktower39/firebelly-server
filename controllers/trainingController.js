@@ -138,6 +138,31 @@ const update_workout_date = (req, res, next) => {
     })
 }
 
+const copy_workout_to_date = (req, res, next) => {
+    Training.find({ accountId: res.locals.user._id, date: req.body.newDate }, function (err, newDateData) {
+        if (err) return next(err);
+        if (newDateData.length > 0) {
+            res.send({ error: `Workout already exists for ${req.body.newDate}` })
+        }
+        else {
+            Training.findOne({ accountId: res.locals.user._id, date: req.body.originalDate }, function (err, data) {
+                if (err) return next(err);
+                let training = new Training({ ...data, accountId: res.locals.user._id, date: req.body.newDate });
+                let saveTraining = () => {
+                    training.save((err) => {
+                        if (err) return next(err);
+                        res.send({
+                            status: 'success',
+                            training
+                        })
+                    });
+                }
+                saveTraining();
+            })
+        }
+    })
+}
+
 const delete_workout_date = (req, res, next) => {
     Training.findOneAndDelete({ accountId: res.locals.user._id, date: req.body.date }, function (err, data) {
         if (err) {
@@ -156,6 +181,7 @@ module.exports = {
     get_weekly_training,
     get_exercise_list,
     get_exercise_history,
+    copy_workout_to_date,
     update_workout_date,
     delete_workout_date,
     get_client_training,
