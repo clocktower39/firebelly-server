@@ -1,5 +1,6 @@
 const Training = require('../models/training');
 const Relationship = require('../models/relationship');
+const mongoose = require('mongoose');
 
 const create_training = (req, res, next) => {
     let training = new Training({
@@ -147,17 +148,16 @@ const copy_workout_to_date = (req, res, next) => {
         else {
             Training.findOne({ accountId: res.locals.user._id, date: req.body.originalDate }, function (err, data) {
                 if (err) return next(err);
-                let training = new Training({ ...data, accountId: res.locals.user._id, date: req.body.newDate });
-                let saveTraining = () => {
-                    training.save((err) => {
-                        if (err) return next(err);
-                        res.send({
-                            status: 'success',
-                            training
-                        })
-                    });
-                }
-                saveTraining();
+
+                data._id = mongoose.Types.ObjectId();
+                data.isNew = true;
+                data.date = req.body.newDate;
+                data.save((err) => {
+                    if (err) return next(err);
+                    res.send({
+                        status: 'Copy Successful',
+                    })
+                });
             })
         }
     })
