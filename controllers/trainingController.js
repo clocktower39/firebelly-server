@@ -140,18 +140,56 @@ const update_workout_date = (req, res, next) => {
 }
 
 const copy_workout_to_date = (req, res, next) => {
-    Training.find({ accountId: res.locals.user._id, date: req.body.newDate }, function (err, newDateData) {
+    const { newDate, originalDate, option = 'exact' } = req.body;
+    Training.find({ accountId: res.locals.user._id, date: newDate }, function (err, newDateData) {
         if (err) return next(err);
         if (newDateData.length > 0) {
-            res.send({ error: `Workout already exists for ${req.body.newDate}` })
+            res.send({ error: `Workout already exists for ${newDate}` })
         }
         else {
-            Training.findOne({ accountId: res.locals.user._id, date: req.body.originalDate }, function (err, data) {
+            Training.findOne({ accountId: res.locals.user._id, date: originalDate }, function (err, data) {
                 if (err) return next(err);
+                switch (option){
+                    // case 'achievedToNewGoal':
+                    //     data.training.map(set => {
+                    //         set.map(exercise => {
+
+                    // Loop through and move correlated achieved to goals
+                    //             exercise.goals = exercise.achieved;
+
+
+                    //             for( const prop in exercise.achieved) {
+                    //                 if(Array.isArray(exercise.achieved[prop])){
+                    //                     exercise.achieved[prop] = exercise.achieved[prop].map(v => {
+                    //                         return '0';
+                    //                     })
+                    //                 }
+                    //             }
+                    //             return exercise;
+                    //         })
+                    //         return set;
+                    //     })
+                    //     break;
+                    case 'copyGoalOnly':
+                        data.training.map(set => {
+                            set.map(exercise => {
+                                for( const prop in exercise.achieved) {
+                                    if(Array.isArray(exercise.achieved[prop])){
+                                        exercise.achieved[prop] = exercise.achieved[prop].map(v => {
+                                            return '0';
+                                        })
+                                    }
+                                }
+                                return exercise;
+                            })
+                            return set;
+                        })
+                        break;
+                }
 
                 data._id = mongoose.Types.ObjectId();
                 data.isNew = true;
-                data.date = req.body.newDate;
+                data.date = newDate;
                 data.save((err) => {
                     if (err) return next(err);
                     res.send({
