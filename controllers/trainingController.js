@@ -150,26 +150,30 @@ const copy_workout_to_date = (req, res, next) => {
             Training.findOne({ accountId: res.locals.user._id, date: originalDate }, function (err, data) {
                 if (err) return next(err);
                 switch (option){
-                    // case 'achievedToNewGoal':
-                    //     data.training.map(set => {
-                    //         set.map(exercise => {
+                    case 'achievedToNewGoal':
+                        data.training.map(set => {
+                            set.map(exercise => {
 
-                    // Loop through and move correlated achieved to goals
-                    //             exercise.goals = exercise.achieved;
+                                // Loop through and move correlated achieved to goals
+                                // Still need to restructure training model and remove unused properties
+                                exercise.goals.exactReps = exercise.achieved.reps;
+                                exercise.goals.weight = exercise.achieved.weight;
+                                exercise.goals.percent = exercise.achieved.percent;
+                                exercise.goals.seconds = exercise.achieved.seconds;
 
 
-                    //             for( const prop in exercise.achieved) {
-                    //                 if(Array.isArray(exercise.achieved[prop])){
-                    //                     exercise.achieved[prop] = exercise.achieved[prop].map(v => {
-                    //                         return '0';
-                    //                     })
-                    //                 }
-                    //             }
-                    //             return exercise;
-                    //         })
-                    //         return set;
-                    //     })
-                    //     break;
+                                for( const prop in exercise.achieved) {
+                                    if(Array.isArray(exercise.achieved[prop])){
+                                        exercise.achieved[prop] = exercise.achieved[prop].map(v => {
+                                            return '0';
+                                        })
+                                    }
+                                }
+                                return exercise;
+                            })
+                            return set;
+                        })
+                        break;
                     case 'copyGoalOnly':
                         data.training.map(set => {
                             set.map(exercise => {
