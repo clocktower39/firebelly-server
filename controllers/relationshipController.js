@@ -14,13 +14,13 @@ const manage_relationship = (req, res, next) => {
         User.findById(req.body.trainerId, function (err, data) {
             if (err) return next(err);
             if (data === null || data.isTrainer === false) {
-                res.send({status: 'error', error: 'Trainer does not exist',});
+                res.send({ status: 'error', error: 'Trainer does not exist', });
             }
             else {
                 User.findById(req.body.clientId, function (err, data) {
                     if (err) throw err;
                     if (data === null) {
-                        res.send({status: 'error', error: 'Client does not exist'});
+                        res.send({ status: 'error', error: 'Client does not exist' });
                     }
                     else {
                         let relationship = new Relationship(req.body);
@@ -42,6 +42,15 @@ const manage_relationship = (req, res, next) => {
             }
         })
     }
+}
+
+const change_relationship_status = (req, res, next) => {
+    const { clientId, accepted } = req.body;
+
+    Relationship.findOneAndUpdate({ clientId, trainerId: res.locals.user._id }, { accepted }, function (err, data) {
+        if (err) return next(err);
+        res.sendStatus(204)
+    });
 }
 
 const get_relationships = (req, res, next) => {
@@ -113,6 +122,7 @@ const remove_relationship = (req, res, next) => {
 
 module.exports = {
     manage_relationship,
+    change_relationship_status,
     get_relationships,
     get_my_relationships,
     get_my_clients,
