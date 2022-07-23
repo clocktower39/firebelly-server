@@ -1,4 +1,5 @@
 const Goal = require('../models/goal');
+const Relationship = require('../models/relationship');
 
 const create_goal = (req, res, next) => {
     let goal = new Goal({
@@ -65,10 +66,32 @@ const get_goals = (req, res, next) => {
     });
 }
 
+const get_client_goals = (req, res, next) => {
+    const { clientId } = req.body;
+    Relationship.findOne({ trainerId: res.locals.user._id, clientId }, (err, relationship) => {
+        if (err) return next(err);
+        
+        if(!relationship){
+            res.send({ error: 'Relationship does not exist.'});
+        }
+        else if(relationship.accepted){
+            Goal.find({ accountId: clientId }, function (err, data) {
+                if (err) return next(err);
+                res.send(data);
+            });
+        }
+        else{
+            res.send({ error: 'Relationship pending.'});
+        }
+    })
+
+}
+
 module.exports = {
     create_goal,
     remove_goal,
     update_goal,
     get_goals,
     comment_on_goal,
+    get_client_goals,
 }

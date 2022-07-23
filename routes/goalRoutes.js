@@ -5,6 +5,7 @@ const auth = require("../middleware/auth");
 const router = express.Router();
 
 router.get('/goals', auth, goalController.get_goals);
+router.post('/clientGoals', auth, goalController.get_client_goals);
 router.post('/createGoal', auth, goalController.create_goal);
 router.post('/removeGoal', auth, goalController.remove_goal);
 router.post('/updateGoal', auth, goalController.update_goal);
