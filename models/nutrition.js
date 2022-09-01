@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const nutritionSchema = new mongoose.Schema({
     date: { type: Date, required: true },
-    accountId: { type: String, required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     stats: {
         caloriesIn: {
             type: {
