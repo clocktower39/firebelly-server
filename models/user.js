@@ -12,6 +12,10 @@ const UserSchema = new mongoose.Schema({
     dateOfBirth: { type: Date },
     height: { type: String },
     sex: { type: String, },
+    profilePicture: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "profilePictures.files"
+    },
     themeMode: { type: String, required: true, default: 'light', },
 }, { minimize: false })
 
