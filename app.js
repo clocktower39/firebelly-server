@@ -15,6 +15,13 @@ const taskRoutes = require('./routes/taskRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const relationshipRoutes = require('./routes/relationshipRoutes');
 const goalRoutes = require('./routes/goalRoutes');
+global.io = require('./io').initialize(http, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
 // require('dotenv').config();
 const dbUrl = process.env.DBURL;
@@ -39,6 +46,11 @@ app.use('/', taskRoutes);
 app.use('/', noteRoutes);
 app.use('/', relationshipRoutes);
 app.use('/', goalRoutes);
+
+global.io.on('connection', (socket) => {
+    console.log(socket.conn.remoteAddress)
+    console.log('a user connected')
+});
 
 mongoose.connect(dbUrl, 
     {
