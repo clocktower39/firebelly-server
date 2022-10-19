@@ -129,7 +129,7 @@ const get_trainers = (req, res, next) => {
   User.find({ isTrainer: true }, function (err, trainers) {
     if (err) return next(err);
     const publicTrainers = trainers.map(trainer => ({
-      trainerId: trainer._id,
+      trainer: trainer._id,
       firstName: trainer.firstName,
       lastName: trainer.lastName,
       sex: trainer.sex,

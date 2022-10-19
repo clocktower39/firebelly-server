@@ -4,20 +4,20 @@ const userController = require('./userController');
 const mongoose = require('mongoose');
 
 const manage_relationship = (req, res, next) => {
-    req.body.clientId = res.locals.user._id;
+    req.body.client = res.locals.user._id;
     req.body.accepted = false;
     req.body.requestedBy = 'client';
-    if (!mongoose.Types.ObjectId.isValid(req.body.trainerId)) {
+    if (!mongoose.Types.ObjectId.isValid(req.body.trainer)) {
         res.send('Invalid ID entered');
     }
     else {
-        User.findById(req.body.trainerId, function (err, data) {
+        User.findById(req.body.trainer, function (err, data) {
             if (err) return next(err);
             if (data === null || data.isTrainer === false) {
                 res.send({ status: 'error', error: 'Trainer does not exist', });
             }
             else {
-                User.findById(req.body.clientId, function (err, data) {
+                User.findById(req.body.client, function (err, data) {
                     if (err) throw err;
                     if (data === null) {
                         res.send({ status: 'error', error: 'Client does not exist' });
@@ -45,9 +45,9 @@ const manage_relationship = (req, res, next) => {
 }
 
 const change_relationship_status = (req, res, next) => {
-    const { clientId, accepted } = req.body;
+    const { client, accepted } = req.body;
 
-    Relationship.findOneAndUpdate({ clientId, trainerId: res.locals.user._id }, { accepted }, function (err, data) {
+    Relationship.findOneAndUpdate({ client, trainer: res.locals.user._id }, { accepted }, function (err, data) {
         if (err) return next(err);
         res.sendStatus(204)
     });
@@ -55,13 +55,13 @@ const change_relationship_status = (req, res, next) => {
 
 const get_relationships = (req, res, next) => {
     if (req.params.type === 'trainer') {
-        Relationship.find({ trainerId: req.params._id, clientId: res.locals.user._id }, function (err, data) {
+        Relationship.find({ trainer: req.params._id, client: res.locals.user._id }, function (err, data) {
             if (err) return next(err);
             res.send(data)
         });
     }
     else if (req.params.type === 'client') {
-        Relationship.find({ clientId: req.params._id, trainerId: res.locals.user._id }, function (err, data) {
+        Relationship.find({ client: req.params._id, trainer: res.locals.user._id }, function (err, data) {
             if (err) return next(err);
             res.send(data)
         });
@@ -72,18 +72,18 @@ const get_relationships = (req, res, next) => {
 }
 
 const get_my_relationships = async (req, res, next) => {
-    const relationships = await Relationship.find({ clientId: res.locals.user._id }).lean().exec();
+    const relationships = await Relationship.find({ client: res.locals.user._id }).lean().exec();
 
-    const promises = relationships.map(r => User.findById({ _id: r.trainerId }).lean().exec());
+    const promises = relationships.map(r => User.findById({ _id: r.trainer }).lean().exec());
     const trainers = await Promise.all(promises);
 
     const trainerInfo = trainers.map(t => {
-        const accepted = relationships.filter(r => r.trainerId.toString() === t._id.toString())[0].accepted;
+        const accepted = relationships.filter(r => r.trainer.toString() === t._id.toString())[0].accepted;
 
         return {
             firstName: t.firstName,
             lastName: t.lastName,
-            trainerId: t._id,
+            trainer: t._id,
             accepted,
         }
     })
@@ -91,26 +91,28 @@ const get_my_relationships = async (req, res, next) => {
 }
 
 const get_my_clients = async (req, res, next) => {
-    const relationships = await Relationship.find({ trainerId: res.locals.user._id }).lean().exec();
+    const clients = await Relationship.find({ trainer: res.locals.user._id })
+    .populate("client","firstName lastName")
+    .exec();
 
-    const promises = relationships.map(r => User.findById({ _id: r.clientId }).lean().exec());
-    const clients = await Promise.all(promises);
+    // const promises = relationships.map(r => User.findById({ _id: r.client }).lean().exec());
+    // const clients = await Promise.all(promises);
 
-    const clientInfo = clients.map(c => {
-        const accepted = relationships.filter(r => r.clientId.toString() === c._id.toString())[0].accepted;
-        return {
-            firstName: c.firstName,
-            lastName: c.lastName,
-            clientId: c._id,
-            accepted,
-        }
-    })
-    res.send(clientInfo)
+    // const clientInfo = clients.map(c => {
+    //     const accepted = relationships.filter(r => r.client.toString() === c._id.toString())[0].accepted;
+    //     return {
+    //         firstName: c.firstName,
+    //         lastName: c.lastName,
+    //         client: c._id,
+    //         accepted,
+    //     }
+    // })
+    res.send(clients)
 }
 
 const remove_relationship = (req, res, next) => {
-    const { trainerId } = req.body;
-    Relationship.findOneAndDelete({ clientId: res.locals.user._id, trainerId, }, function (err, data) {
+    const { trainer } = req.body;
+    Relationship.findOneAndDelete({ client: res.locals.user._id, trainer, }, function (err, data) {
         if (err) {
             res.send({ error: err })
         }

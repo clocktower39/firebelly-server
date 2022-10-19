@@ -4,7 +4,7 @@ const create_note = (req, res, next) => {
     let note = new Note({
         ...req.body,
         date: new Date(),
-        accountId: res.locals.user._id,
+        user: res.locals.user._id,
         firstName: res.locals.user.firstName,
         lastName: res.locals.user.lastName,
     });
@@ -30,8 +30,9 @@ const update_note = (req, res, next) => {
 }
 
 const get_notes = (req, res, next) => {
-    Note.find({ accountId: res.locals.user._id }, function (err, data) {
+    Note.find({ user: res.locals.user._id }, function (err, data) {
         if (err) return next(err);
+        console.log('ran')
         res.send(data || { results: "No Results" });
     });
 }

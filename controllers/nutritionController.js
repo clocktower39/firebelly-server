@@ -3,7 +3,7 @@ const Nutrition = require('../models/nutrition');
 const create_nutrition = (req, res, next) => {
     let nutrition = new Nutrition({
         ...req.body,
-        accountId: res.locals.user._id,
+        user: res.locals.user._id,
     });
     let saveNutrition = () => {
         nutrition.save((err) => {
@@ -29,7 +29,7 @@ const update_nutrition = (req, res, next) => {
 const get_nutrition = (req, res, next) => {
     const { date } = req.body;
     if(!date) return res.send({status: 'Date required'});
-    Nutrition.find({ accountId: res.locals.user._id, date: new Date(date) }, function (err, data) {
+    Nutrition.find({ user: res.locals.user._id, date: new Date(date) }, function (err, data) {
         if (err) return next(err);
         res.send(data);
     });

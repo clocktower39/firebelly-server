@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const create_training = (req, res, next) => {
     let training = new Training({
         ...req.body,
-        accountId: res.locals.user._id,
+        user: res.locals.user._id,
     });
     let saveTraining = () => {
         training.save((err) => {
@@ -29,21 +29,23 @@ const update_training = (req, res, next) => {
 }
 
 const get_training = (req, res, next) => {
-    Training.find({ accountId: res.locals.user._id, date: req.body.date }, function (err, data) {
+    Training.find({ user: res.locals.user._id, date: req.body.date }, function (err, data) {
         if (err) return next(err);
         res.send(data);
     });
 }
 
 const get_client_training = (req, res, next) => {
-    Relationship.findOne({ trainerId: res.locals.user._id, clientId: req.body.clientId }, (err, relationship) => {
+    console.log(req.body)
+    Relationship.findOne({ trainer: res.locals.user._id, client: req.body.client }, (err, relationship) => {
         if (err) return next(err);
         
         if(!relationship){
+            console.log(relationship)
             res.send({ error: 'Relationship does not exist.'});
         }
         else if(relationship.accepted){
-            Training.find({ accountId: req.body.clientId, date: req.body.date }, function (err, data) {
+            Training.find({ user: req.body.client, date: req.body.date }, function (err, data) {
                 if (err) return next(err);
                 res.send(data);
             });
@@ -68,7 +70,7 @@ const get_weekly_training = (req, res, next) => {
 
     Training.find({
         $or: week.map(day => {
-            return { date: day, accountId: res.locals.user._id };
+            return { date: day, user: res.locals.user._id };
         })
     }, function (err, data) {
         if (err) return next(err);
@@ -87,7 +89,7 @@ const get_weekly_training = (req, res, next) => {
 }
 
 const get_exercise_list = (req, res, next) => {
-    Training.find({ accountId: res.locals.user._id }, function (err, data) {
+    Training.find({ user: res.locals.user._id }, function (err, data) {
         if (err) return next(err);
 
         let exerciseList = [];
@@ -106,7 +108,7 @@ const get_exercise_list = (req, res, next) => {
 }
 
 const get_exercise_history = (req, res, next) => {
-    Training.find({ accountId: res.locals.user._id }, function (err, data) {
+    Training.find({ user: res.locals.user._id }, function (err, data) {
         if (err) return next(err);
 
         let historyList = [];
@@ -124,13 +126,13 @@ const get_exercise_history = (req, res, next) => {
 }
 
 const update_workout_date = (req, res, next) => {
-    Training.find({ accountId: res.locals.user._id, date: req.body.newDate }, function (err, newDateData) {
+    Training.find({ user: res.locals.user._id, date: req.body.newDate }, function (err, newDateData) {
         if (err) return next(err);
         if (newDateData.length > 0) {
             res.send({ error: `Workout already exists for ${req.body.newDate}` })
         }
         else {
-            Training.findOneAndUpdate({ accountId: res.locals.user._id, date: req.body.originalDate }, { date: req.body.newDate }, { new: true }, function (err, data) {
+            Training.findOneAndUpdate({ user: res.locals.user._id, date: req.body.originalDate }, { date: req.body.newDate }, { new: true }, function (err, data) {
                 if (err) return next(err);
 
                 res.send(data);
@@ -141,13 +143,13 @@ const update_workout_date = (req, res, next) => {
 
 const copy_workout_to_date = (req, res, next) => {
     const { newDate, originalDate, option = 'exact' } = req.body;
-    Training.find({ accountId: res.locals.user._id, date: newDate }, function (err, newDateData) {
+    Training.find({ user: res.locals.user._id, date: newDate }, function (err, newDateData) {
         if (err) return next(err);
         if (newDateData.length > 0) {
             res.send({ error: `Workout already exists for ${newDate}` })
         }
         else {
-            Training.findOne({ accountId: res.locals.user._id, date: originalDate }, function (err, data) {
+            Training.findOne({ user: res.locals.user._id, date: originalDate }, function (err, data) {
                 if (err) return next(err);
                 switch (option){
                     case 'achievedToNewGoal':
@@ -206,7 +208,7 @@ const copy_workout_to_date = (req, res, next) => {
 }
 
 const delete_workout_date = (req, res, next) => {
-    Training.findOneAndDelete({ accountId: res.locals.user._id, date: req.body.date }, function (err, data) {
+    Training.findOneAndDelete({ user: res.locals.user._id, date: req.body.date }, function (err, data) {
         if (err) {
             res.send({ error: err })
         }
