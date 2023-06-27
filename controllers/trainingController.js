@@ -28,7 +28,14 @@ const update_training = (req, res, next) => {
     })
 }
 
-const get_training = (req, res, next) => {
+const get_training_by_id = (req, res, next) => {
+    Training.find({ user: res.locals.user._id, _id: req.body._id }, function (err, data) {
+        if (err) return next(err);
+        res.send(data);
+    });
+}
+
+const get_workouts_by_date = (req, res, next) => {
     Training.find({ user: res.locals.user._id, date: req.body.date }, function (err, data) {
         if (err) return next(err);
         res.send(data);
@@ -36,7 +43,6 @@ const get_training = (req, res, next) => {
 }
 
 const get_client_training = (req, res, next) => {
-    console.log(req.body)
     Relationship.findOne({ trainer: res.locals.user._id, client: req.body.client }, (err, relationship) => {
         if (err) return next(err);
         
@@ -58,35 +64,26 @@ const get_client_training = (req, res, next) => {
 }
 
 const get_weekly_training = (req, res, next) => {
-
-    let loopDate = new Date(req.body.startDate);
-    let endDate = new Date(req.body.endDate);
-    let week = [];
-
-    while (loopDate <= endDate) {
-        week.push(loopDate)
-        loopDate = new Date(new Date(loopDate).getTime() + 1 * (24 * 60 * 60 * 1000));
-    }
-
-    Training.find({
-        $or: week.map(day => {
-            return { date: day, user: res.locals.user._id };
-        })
-    }, function (err, data) {
+    const selectedDate = new Date(req.body.date);
+    const startDate = new Date(selectedDate);
+    startDate.setDate(startDate.getDate() - 6);
+    const endDate = new Date(selectedDate);
+    endDate.setDate(endDate.getDate() + 1);
+  
+    Training.find(
+      {
+        date: {
+          $gte: startDate,
+          $lt: endDate,
+        },
+        user: res.locals.user._id,
+      },
+      function (err, data) {
         if (err) return next(err);
-        week.forEach((date) => {
-            let doesDateExist = false;
-            data.map(day => {
-                if (new Date(day.date).getTime() === new Date(date).getTime()) {
-                    doesDateExist = true;
-                }
-            })
-            if (!doesDateExist) data.push({ date: new Date(date), category: "", training: [] })
-        });
         res.send(data);
-    });
-
-}
+      }
+    );
+  };
 
 const get_exercise_list = (req, res, next) => {
     Training.find({ user: res.locals.user._id }, function (err, data) {
@@ -125,90 +122,74 @@ const get_exercise_history = (req, res, next) => {
     }).lean().exec();
 }
 
-const update_workout_date = (req, res, next) => {
-    Training.find({ user: res.locals.user._id, date: req.body.newDate }, function (err, newDateData) {
-        if (err) return next(err);
-        if (newDateData.length > 0) {
-            res.send({ error: `Workout already exists for ${req.body.newDate}` })
-        }
-        else {
-            Training.findOneAndUpdate({ user: res.locals.user._id, date: req.body.originalDate }, { date: req.body.newDate }, { new: true }, function (err, data) {
-                if (err) return next(err);
+const update_workout_date_by_id = (req, res, next) => {
+        Training.findOneAndUpdate({ user: res.locals.user._id, _id: req.body._id }, { date: req.body.newDate }, { new: true }, function (err, data) {
+            if (err) return next(err);
 
-                res.send(data);
-            })
-        }
+            res.send(data);
     })
 }
 
-const copy_workout_to_date = (req, res, next) => {
-    const { newDate, originalDate, option = 'exact' } = req.body;
-    Training.find({ user: res.locals.user._id, date: newDate }, function (err, newDateData) {
+const copy_workout_by_id = (req, res, next) => {
+    const { newDate, _id, option = 'exact' } = req.body;
+    Training.findOne({ user: res.locals.user._id, _id, }, function (err, data) {
         if (err) return next(err);
-        if (newDateData.length > 0) {
-            res.send({ error: `Workout already exists for ${newDate}` })
-        }
-        else {
-            Training.findOne({ user: res.locals.user._id, date: originalDate }, function (err, data) {
-                if (err) return next(err);
-                switch (option){
-                    case 'achievedToNewGoal':
-                        data.training.map(set => {
-                            set.map(exercise => {
+        switch (option){
+            case 'achievedToNewGoal':
+                data.training.map(set => {
+                    set.map(exercise => {
 
-                                // Loop through and move correlated achieved to goals
-                                // Still need to restructure training model and remove unused properties
-                                exercise.goals.exactReps = exercise.achieved.reps;
-                                exercise.goals.weight = exercise.achieved.weight;
-                                exercise.goals.percent = exercise.achieved.percent;
-                                exercise.goals.seconds = exercise.achieved.seconds;
+                        // Loop through and move correlated achieved to goals
+                        // Still need to restructure training model and remove unused properties
+                        exercise.goals.exactReps = exercise.achieved.reps;
+                        exercise.goals.weight = exercise.achieved.weight;
+                        exercise.goals.percent = exercise.achieved.percent;
+                        exercise.goals.seconds = exercise.achieved.seconds;
 
 
-                                for( const prop in exercise.achieved) {
-                                    if(Array.isArray(exercise.achieved[prop])){
-                                        exercise.achieved[prop] = exercise.achieved[prop].map(v => {
-                                            return '0';
-                                        })
-                                    }
-                                }
-                                return exercise;
-                            })
-                            return set;
-                        })
-                        break;
-                    case 'copyGoalOnly':
-                        data.training.map(set => {
-                            set.map(exercise => {
-                                for( const prop in exercise.achieved) {
-                                    if(Array.isArray(exercise.achieved[prop])){
-                                        exercise.achieved[prop] = exercise.achieved[prop].map(v => {
-                                            return '0';
-                                        })
-                                    }
-                                }
-                                return exercise;
-                            })
-                            return set;
-                        })
-                        break;
-                }
-
-                data._id = mongoose.Types.ObjectId();
-                data.isNew = true;
-                data.date = newDate;
-                data.save((err) => {
-                    if (err) return next(err);
-                    res.send({
-                        status: 'Copy Successful',
+                        for( const prop in exercise.achieved) {
+                            if(Array.isArray(exercise.achieved[prop])){
+                                exercise.achieved[prop] = exercise.achieved[prop].map(v => {
+                                    return '0';
+                                })
+                            }
+                        }
+                        return exercise;
                     })
-                });
-            })
+                    return set;
+                })
+                break;
+            case 'copyGoalOnly':
+                data.training.map(set => {
+                    set.map(exercise => {
+                        for( const prop in exercise.achieved) {
+                            if(Array.isArray(exercise.achieved[prop])){
+                                exercise.achieved[prop] = exercise.achieved[prop].map(v => {
+                                    return '0';
+                                })
+                            }
+                        }
+                        return exercise;
+                    })
+                    return set;
+                })
+                break;
         }
+
+        data._id = mongoose.Types.ObjectId();
+        data.isNew = true;
+        data.date = newDate;
+        data.save((err) => {
+            if (err) return next(err);
+            res.send({
+                status: 'Copy Successful',
+            })
+        });
     })
 }
 
-const delete_workout_date = (req, res, next) => {
-    Training.findOneAndDelete({ user: res.locals.user._id, date: req.body.date }, function (err, data) {
+const delete_workout_by_id = (req, res, next) => {
+    Training.findOneAndDelete({ user: res.locals.user._id, _id: req.body._id }, function (err, data) {
         if (err) {
             res.send({ error: err })
         }
@@ -220,13 +201,14 @@ const delete_workout_date = (req, res, next) => {
 
 module.exports = {
     create_training,
-    get_training,
+    get_training_by_id,
+    get_workouts_by_date,
     update_training,
     get_weekly_training,
     get_exercise_list,
     get_exercise_history,
-    copy_workout_to_date,
-    update_workout_date,
-    delete_workout_date,
+    copy_workout_by_id,
+    update_workout_date_by_id,
+    delete_workout_by_id,
     get_client_training,
 }
