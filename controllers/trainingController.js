@@ -202,6 +202,7 @@ const delete_workout_by_id = (req, res, next) => {
 const workout_history_request = async (req, res, next) => {
     const page = parseInt(req.body.page) || 1; // Get the requested page number from the request body
     const limit = 15; // Set the number of trainings per page
+    const user = res.locals.user._id
   
     try {
       const options = {
@@ -210,7 +211,7 @@ const workout_history_request = async (req, res, next) => {
         sort: { date: -1 }, // Sort by date in descending order to get the most recent trainings first
       };
   
-      const result = await Training.paginate({}, options);
+      const result = await Training.paginate({ user }, options);
   
       res.json(result);
     } catch (error) {
