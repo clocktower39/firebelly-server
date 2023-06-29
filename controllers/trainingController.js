@@ -112,7 +112,7 @@ const get_exercise_history = (req, res, next) => {
 
         data.map(day => {
             day.training.map(set => {
-                let targetedExercise = set.filter(exercise => exercise.exercise.toLowerCase() === req.body.targetExercise.toLowerCase())
+                let targetedExercise = set.filter(exercise => exercise?.exercise?.toLowerCase() === req.body.targetExercise.toLowerCase())
                 if (targetedExercise.length > 0) {
                     historyList.push({ ...targetedExercise[0], date: day.date })
                 }
@@ -199,6 +199,26 @@ const delete_workout_by_id = (req, res, next) => {
     })
 }
 
+const workout_history_request = async (req, res, next) => {
+    const page = parseInt(req.body.page) || 1; // Get the requested page number from the request body
+    const limit = 15; // Set the number of trainings per page
+  
+    try {
+      const options = {
+        page,
+        limit,
+        sort: { date: -1 }, // Sort by date in descending order to get the most recent trainings first
+      };
+  
+      const result = await Training.paginate({}, options);
+  
+      res.json(result);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+}
+
 module.exports = {
     create_training,
     get_training_by_id,
@@ -211,4 +231,5 @@ module.exports = {
     update_workout_date_by_id,
     delete_workout_by_id,
     get_client_training,
+    workout_history_request,
 }

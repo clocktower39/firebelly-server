@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const mongoosePaginate = require("mongoose-paginate-v2");
 
 const trainingSchema = new mongoose.Schema(
   {
@@ -60,6 +61,8 @@ const trainingSchema = new mongoose.Schema(
   },
   { minimize: false }
 );
+
+trainingSchema.plugin(mongoosePaginate);
 
 const Training = mongoose.model("Training", trainingSchema);
 module.exports = Training;

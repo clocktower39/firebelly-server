@@ -22,5 +22,6 @@ router.get('/myExerciseList', auth, trainingController.get_exercise_list);
 router.post('/copyWorkoutById', auth, trainingController.copy_workout_by_id);
 router.post('/updateWorkoutDateById', auth, trainingController.update_workout_date_by_id);
 router.post('/deleteWorkoutById', auth, trainingController.delete_workout_by_id);
+router.post('/getWorkoutHistory', auth, trainingController.workout_history_request);
 
 module.exports = router;
