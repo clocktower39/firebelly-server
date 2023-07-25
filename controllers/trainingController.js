@@ -151,9 +151,10 @@ const update_workout_date_by_id = (req, res, next) => {
 };
 
 const copy_workout_by_id = (req, res, next) => {
-  const { newDate, _id, option = "exact" } = req.body;
+  const { newDate, _id, option = "exact", newTitle } = req.body;
   Training.findOne({ user: res.locals.user._id, _id }, function (err, data) {
     if (err) return next(err);
+    if(newTitle) data.title = newTitle;
     switch (option) {
       case "achievedToNewGoal":
         data.training.map((set) => {
