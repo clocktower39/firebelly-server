@@ -21,6 +21,7 @@ const trainingSchema = new mongoose.Schema(
               weight: { type: Array },
               percent: { type: Array },
               seconds: { type: Array },
+              oneRepMax: { type: Number },
             },
             achieved: {
               sets: { type: Number },
