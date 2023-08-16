@@ -2,6 +2,8 @@ const express = require('express');
 const userController = require('../controllers/userController');
 const auth = require("../middleware/auth");
 const { validate, Joi } = require('express-validation');
+const { uploadProfilePicture } = require("../mygridfs");
+
 const router = express.Router();
 
 const loginValidate = {
@@ -35,5 +37,8 @@ router.post('/signup', validate(signupValidate, {}, {}), userController.signup_u
 router.post('/updateUser', auth, userController.update_user);
 router.post('/getUser', auth, userController.get_userInfo);
 router.post('/changePassword', auth, userController.change_password);
+router.post('/user/upload/profilePicture', auth, uploadProfilePicture.single("file"), userController.upload_profile_picture);
+router.get('/user/profilePicture/:id', userController.get_profile_picture);
+router.get('/user/remove/image/', auth, userController.delete_profile_picture);
 
 module.exports = router;

@@ -15,6 +15,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const relationshipRoutes = require('./routes/relationshipRoutes');
 const goalRoutes = require('./routes/goalRoutes');
 const conversationRoutes = require('./routes/conversationRoutes');
+const methodOverride = require('method-override');
 global.io = require('./io').initialize(http, {
   cors: {
     origin: "*",
@@ -35,8 +36,9 @@ const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
 app.use(cors());
 app.use(express.static(__dirname));
-app.use(bodyParser.urlencoded({extended: false}))
+app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
+app.use(methodOverride('_method'));
 
 app.use('/', userRoutes);
 app.use('/', exerciseRoutes);

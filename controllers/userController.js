@@ -137,6 +137,79 @@ const get_trainers = (req, res, next) => {
     res.send(publicTrainers);
   });
 };
+const upload_profile_picture = (req, res) => {
+    let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+        bucketName: 'profilePicture'
+    });
+
+    User.findById(res.locals.user._id, (err, user) => {
+        if (err) return res.send(err);
+        if (user.profilePicture) {
+            gridfsBucket.delete(mongoose.Types.ObjectId(user.profilePicture));
+        }
+        user.profilePicture = res.req.file.id;
+        user.save((err, u) => {
+            if (err) return res.send(err);
+            return res.sendStatus(200);
+        });
+    })
+}
+
+const get_profile_picture = (req, res) => {
+    if (req.params.id) {
+        let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+            bucketName: 'profilePicture'
+        });
+
+        gridfsBucket.find({ _id: mongoose.Types.ObjectId(req.params.id) }).toArray((err, files) => {
+            // Check if files
+            if (!files || files.length === 0) {
+                return res.status(404).json({
+                    err: 'No files exist'
+                });
+            }
+
+            // Check if image
+            if (files[0].contentType === 'image/jpeg' || files[0].contentType === 'image/png') {
+                // Read output to browser
+                const readstream = gridfsBucket.openDownloadStream(files[0]._id);
+                readstream.pipe(res);
+            } else {
+                res.status(404).json({
+                    err: 'Not an image'
+                });
+            }
+        });
+    }
+    else {
+        res.status(404).json({
+            err: 'Missing parameter',
+        })
+    }
+}
+
+const delete_profile_picture = (req, res) => {
+    let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+        bucketName: 'profilePicture'
+    });
+
+    User.findById(res.locals.user._id, (err, user) => {
+        if (err) return res.send(err);
+        if (user.profilePicture) {
+            gridfsBucket.delete(mongoose.Types.ObjectId(user.profilePicture));
+            user.profilePicture = undefined;
+            user.save((err, u) => {
+                if (err) return res.send(err);
+                return res.sendStatus(200);
+            });
+        }
+        else {
+            return res.sendStatus(204);
+        }
+    })
+
+
+}
 
 module.exports = {
   signup_user,
@@ -146,4 +219,7 @@ module.exports = {
   get_userInfo,
   change_password,
   get_trainers,
+  upload_profile_picture,
+  get_profile_picture,
+  delete_profile_picture,
 };
