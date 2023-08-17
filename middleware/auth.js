@@ -1,8 +1,9 @@
 const jwt = require("jsonwebtoken");
 require('dotenv').config();
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
-const verifyToken = (req, res, next) => {
+const verifyAccessToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; 
 
@@ -14,4 +15,16 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-module.exports = verifyToken;
+const verifyRefreshToken = (refreshToken) => {
+  return new Promise((resolve, reject) => {
+    jwt.verify(refreshToken, REFRESH_TOKEN_SECRET, (err, user) => {
+      if (err) return reject(err);
+      resolve(user);
+    });
+  });
+};
+
+module.exports = {
+  verifyAccessToken,
+  verifyRefreshToken
+};

@@ -1,6 +1,6 @@
 const express = require('express');
 const userController = require('../controllers/userController');
-const auth = require("../middleware/auth");
+const { verifyAccessToken, verifyRefreshToken } = require("../middleware/auth");
 const { validate, Joi } = require('express-validation');
 const { uploadProfilePicture } = require("../mygridfs");
 
@@ -30,15 +30,16 @@ const signupValidate = {
     }),
 }
 
-router.get('/checkAuthToken', auth, userController.checkAuthLoginToken);
-router.get('/trainers', auth, userController.get_trainers);
+router.get('/checkAuthToken', verifyAccessToken, userController.checkAuthLoginToken);
+router.get('/trainers', verifyAccessToken, userController.get_trainers);
 router.post('/login', validate(loginValidate, {}, {}), userController.login_user);
 router.post('/signup', validate(signupValidate, {}, {}), userController.signup_user);
-router.post('/updateUser', auth, userController.update_user);
-router.post('/getUser', auth, userController.get_userInfo);
-router.post('/changePassword', auth, userController.change_password);
-router.post('/user/upload/profilePicture', auth, uploadProfilePicture.single("file"), userController.upload_profile_picture);
+router.post('/updateUser', verifyAccessToken, userController.update_user);
+router.post('/getUser', verifyAccessToken, userController.get_userInfo);
+router.post('/changePassword', verifyAccessToken, userController.change_password);
+router.post('/user/upload/profilePicture', verifyAccessToken, uploadProfilePicture.single("file"), userController.upload_profile_picture);
 router.get('/user/profilePicture/:id', userController.get_profile_picture);
-router.get('/user/remove/image/', auth, userController.delete_profile_picture);
+router.get('/user/remove/image/', verifyAccessToken, userController.delete_profile_picture);
+router.post("/refresh-tokens", userController.refresh_tokens);
 
 module.exports = router;
