@@ -54,7 +54,6 @@ const get_client_training = (req, res, next) => {
       if (err) return next(err);
 
       if (!relationship) {
-        console.log(relationship);
         res.send({ error: "Relationship does not exist." });
       } else if (relationship.accepted) {
         Training.find({ user: req.body.client, date: req.body.date }, function (err, data) {
@@ -250,7 +249,6 @@ const update_exercise_name = async (req, res, next) => {
       day.training.forEach((set) => {
         set.forEach((exercise) => {
           if (exercise.exercise === incorrectExercise) {
-            console.log(`${day.date} | ${exercise.exercise}`);
             changelog.push(`${day.date} | ${exercise.exercise}`);
             exercise.exercise = correctExercise;
           }

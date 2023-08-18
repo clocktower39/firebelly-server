@@ -17,9 +17,9 @@ const verifyAccessToken = (req, res, next) => {
 
 const verifyRefreshToken = (refreshToken) => {
   return new Promise((resolve, reject) => {
-    jwt.verify(refreshToken, REFRESH_TOKEN_SECRET, (err, user) => {
+    jwt.verify(refreshToken, REFRESH_TOKEN_SECRET, (err, verifiedRefreshToken) => {
       if (err) return reject(err);
-      resolve(user);
+      resolve(verifiedRefreshToken);
     });
   });
 };

@@ -70,18 +70,23 @@ const login_user = (req, res, next) => {
 
 const refresh_tokens = async (req, res, next) => {
   const { refreshToken } = req.body;
-  console.log(refreshToken)
 
   try {
-    const user = await verifyRefreshToken(refreshToken);
-    console.log(verifyRefreshToken(refreshToken))
+    const verifiedRefreshToken = await verifyRefreshToken(refreshToken);
+    const user = await User.findById(verifiedRefreshToken._id).exec();
+
+    if (!user) {
+      // Handle case when user is not found
+      return res.status(404).send({ error: "User not found" });
+    }
+
     const tokens = createTokens(user);
 
     res.send({
       accessToken: tokens.accessToken,
     });
   } catch (err) {
-    res.status(403).send({ error: "Invalid refresh token" });
+    res.status(403).send({ error: "Invalid refresh token", err });
   }
 };
 
@@ -187,7 +192,11 @@ const upload_profile_picture = (req, res) => {
     user.profilePicture = res.req.file.id;
     user.save((err, u) => {
       if (err) return res.send(err);
-      return res.sendStatus(200);
+      const tokens = createTokens(u);
+
+      return res.status(200).json({
+        accessToken: tokens.accessToken,
+      });
     });
   });
 };

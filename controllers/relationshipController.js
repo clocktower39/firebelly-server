@@ -26,7 +26,6 @@ const manage_relationship = (req, res, next) => {
                         let relationship = new Relationship(req.body);
                         relationship.save((err) => {
                             if (err) {
-                                console.log(err);
                                 res.send({ error: { err }, status: 'error', });
                             }
                             else {
