@@ -101,7 +101,7 @@ const change_password = (req, res, next) => {
       user.comparePassword(req.body.currentPassword, function (err, isMatch) {
         if (err) {
           res.send({
-            error: { status: "Incorrect Current Password" },
+            error: err,
           });
         }
         if (isMatch) {
@@ -116,7 +116,23 @@ const change_password = (req, res, next) => {
           });
         } else {
           res.send({
-            error: { status: "Password change failed." },
+            name: "Validation Failed",
+            message: "Validation Failed",
+            statusCode: 400,
+            error: "Bad Request",
+            details: { 
+              body: [
+                {
+                  message: "Incorrect Current Password.",
+                  path: ['currentPassword'],
+                  context: {
+                    label: "currentPassword",
+                    value: "",
+                    key: "currentPassword",
+                  },
+                },
+              ],
+              status: "Incorrect Current Password." },
           });
         }
       });
