@@ -7,7 +7,7 @@ const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
 const createTokens = (user) => {
   const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
-    expiresIn: "30m", // Set a shorter expiration for access tokens
+    expiresIn: "180m", // Set a shorter expiration for access tokens
   });
 
   const refreshToken = jwt.sign(user._doc, REFRESH_TOKEN_SECRET, {
