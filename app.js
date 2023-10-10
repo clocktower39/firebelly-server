@@ -23,6 +23,12 @@ global.io = require('./io').initialize(http, {
     credentials: true
   }
 });
+const dayjs = require('dayjs');
+const advancedFormat = require("dayjs/plugin/advancedFormat");
+const utc = require("dayjs/plugin/utc");
+
+dayjs.extend(utc);
+dayjs.extend(advancedFormat);
 
 // require('dotenv').config();
 const dbUrl = process.env.DBURL;

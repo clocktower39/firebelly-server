@@ -59,6 +59,10 @@ const trainingSchema = new mongoose.Schema(
       ],
       required: true, 
     },
+    queuePosition: {
+      type: Number,
+      default: 0,
+    },
   },
   { minimize: false }
 );

@@ -23,6 +23,8 @@ router.post('/copyWorkoutById', verifyAccessToken, trainingController.copy_worko
 router.post('/updateWorkoutDateById', verifyAccessToken, trainingController.update_workout_date_by_id);
 router.post('/deleteWorkoutById', verifyAccessToken, trainingController.delete_workout_by_id);
 router.post('/getWorkoutHistory', verifyAccessToken, trainingController.workout_history_request);
+router.post('/workoutMonth', verifyAccessToken, trainingController.workout_month_request);
 router.post('/upateExerciseName', verifyAccessToken, trainingController.update_exercise_name);
+router.get('/getWorkoutQueue', verifyAccessToken, trainingController.get_workout_queue);
 
 module.exports = router;

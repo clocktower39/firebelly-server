@@ -1,6 +1,7 @@
 const Training = require("../models/training");
 const Relationship = require("../models/relationship");
 const mongoose = require("mongoose");
+const dayjs = require("dayjs");
 
 const create_training = (req, res, next) => {
   let training = new Training({
@@ -35,6 +36,13 @@ const update_training = (req, res, next) => {
 
 const get_training_by_id = (req, res, next) => {
   Training.find({ user: res.locals.user._id, _id: req.body._id }, function (err, data) {
+    if (err) return next(err);
+    res.send(data);
+  });
+};
+
+const get_workout_queue = (req, res, next) => {
+  Training.find({ user: res.locals.user._id, date: { $exists: false } }, function (err, data) {
     if (err) return next(err);
     res.send(data);
   });
@@ -237,6 +245,43 @@ const workout_history_request = async (req, res, next) => {
   }
 };
 
+const workout_month_request = async (req, res, next) => {
+  const user = res.locals.user._id;
+
+  try {
+    // Parse the date sent by the client
+    const clientDate = dayjs(req.body.date);
+
+    // Convert the client's date to UTC
+    const clientDateUTC = clientDate.utc();
+
+    // Extract the year and month from the client's date
+    const year = clientDateUTC.year();
+    const month = clientDateUTC.month() + 1; // Adding 1 because months are zero-indexed
+
+    // Use dayjs to construct a range for the specified month and year
+    const startDate = dayjs.utc(`${year}-${month}-01`);
+    const endDate = startDate.endOf('month');
+
+    // Query the Training collection to find entries within the specified month and year
+    const result = await Training.find({
+      user: res.locals.user._id,
+      date: {
+        $gte: startDate.toDate(), // Greater than or equal to the start of the month in UTC
+        $lte: endDate.toDate(),   // Less than or equal to the end of the month in UTC
+      },
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
+
+
 const update_exercise_name = async (req, res, next) => {
   const { incorrectExercise, correctExercise } = req.body;
 
@@ -278,6 +323,7 @@ const update_exercise_name = async (req, res, next) => {
 module.exports = {
   create_training,
   get_training_by_id,
+  get_workout_queue,
   get_workouts_by_date,
   update_training,
   get_weekly_training,
@@ -288,5 +334,6 @@ module.exports = {
   delete_workout_by_id,
   get_client_training,
   workout_history_request,
+  workout_month_request,
   update_exercise_name,
 };
