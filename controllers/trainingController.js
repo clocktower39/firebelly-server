@@ -42,7 +42,7 @@ const get_training_by_id = (req, res, next) => {
 };
 
 const get_workout_queue = (req, res, next) => {
-  Training.find({ user: res.locals.user._id, date: { $exists: false } }, function (err, data) {
+  Training.find({ user: res.locals.user._id, $or: [{ date: null }, { date: { $exists: false } }], }, function (err, data) {
     if (err) return next(err);
     res.send(data);
   });
