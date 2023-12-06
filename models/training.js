@@ -30,6 +30,15 @@ const trainingSchema = new mongoose.Schema(
               percent: { type: Array },
               seconds: { type: Array },
             },
+            notes: {
+              type: [
+                {
+                  timestamp: { type: Date },
+                  user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+                  text: { type: String },
+                },
+              ],
+            },
           },
         ],
       ],
@@ -57,7 +66,7 @@ const trainingSchema = new mongoose.Schema(
           },
         ],
       ],
-      required: true, 
+      required: true,
     },
     queuePosition: {
       type: Number,

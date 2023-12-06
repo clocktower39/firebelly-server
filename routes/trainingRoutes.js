@@ -13,7 +13,6 @@ const exerciseHistoryValidate = {
 
 router.post('/training', verifyAccessToken, trainingController.get_training_by_id);
 router.post('/workouts', verifyAccessToken, trainingController.get_workouts_by_date);
-router.post('/getClientTraining', verifyAccessToken, trainingController.get_client_training);
 router.post('/updateTraining', verifyAccessToken, trainingController.update_training);
 router.post('/createTraining', verifyAccessToken, trainingController.create_training);
 router.post('/trainingWeek', verifyAccessToken, trainingController.get_weekly_training);

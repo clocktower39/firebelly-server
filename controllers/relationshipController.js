@@ -91,7 +91,7 @@ const get_my_relationships = async (req, res, next) => {
 
 const get_my_clients = async (req, res, next) => {
     const clients = await Relationship.find({ trainer: res.locals.user._id })
-    .populate("client","firstName lastName")
+    .populate("client","firstName lastName profilePicture")
     .exec();
 
     // const promises = relationships.map(r => User.findById({ _id: r.client }).lean().exec());
