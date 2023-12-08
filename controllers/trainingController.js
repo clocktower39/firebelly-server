@@ -39,6 +39,12 @@ const get_training_by_id = (req, res, next) => {
     .populate({
       path: "training.notes.user",
       model: "User",
+      select: "_id firstName lastName profilePicture",
+    })
+    .populate({
+      path: "user",
+      model: "User",
+      select: "_id firstName lastName profilePicture",
     })
     .exec(function (err, data) {
       if (err) return next(err);
