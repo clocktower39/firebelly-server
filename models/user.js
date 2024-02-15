@@ -12,6 +12,7 @@ const UserSchema = new mongoose.Schema({
     dateOfBirth: { type: Date },
     height: { type: String },
     sex: { type: String, },
+    gymBarcode: { type: String, },
     profilePicture: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "profilePictures.files"
