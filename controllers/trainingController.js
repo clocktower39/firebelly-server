@@ -202,10 +202,11 @@ const update_workout_date_by_id = async (req, res, next) => {
 };
 
 const copy_workout_by_id = (req, res, next) => {
-  const { newDate, _id, option = "exact", newTitle } = req.body;
+  const { newDate, _id, option = "exact", newTitle, newAccount } = req.body;
 
-  const modifyWorkout = (data, newDate, _id, option, newTitle) => {
+  const modifyWorkout = (data, newDate, _id, option, newTitle, newAccount) => {
     if (newTitle) data.title = newTitle;
+    if (newAccount) data.user = newAccount;
     switch (option) {
       case "achievedToNewGoal":
         data.training.map((set) => {
@@ -273,7 +274,7 @@ const copy_workout_by_id = (req, res, next) => {
 
     // Check if the user requesting the data is the owner
     if (data.user._id.toString() === res.locals.user._id) {
-      return modifyWorkout(data, newDate, _id, option, newTitle);
+      return modifyWorkout(data, newDate, _id, option, newTitle, newAccount);
     }
 
     // If not the owner, check the relationship
@@ -287,7 +288,7 @@ const copy_workout_by_id = (req, res, next) => {
         }
 
         // If the relationship is accepted, send the data
-        modifyWorkout(data, newDate, _id, option, newTitle);
+        modifyWorkout(data, newDate, _id, option, newTitle, newAccount);
       }
     );
   });
