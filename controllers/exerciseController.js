@@ -23,8 +23,16 @@ const get_exercise_library = (req, res, next) => {
     });
 }
 
+const search_exercise = (req, res, next) => {
+    Exercise.findOne({ exerciseTitle: req.body.exerciseTitle, }, function (err, data) {
+        if (err) return next(err);
+        res.send(data);
+    });
+}
+
 
 module.exports = {
     create_exercise,
     get_exercise_library,
+    search_exercise,
 }

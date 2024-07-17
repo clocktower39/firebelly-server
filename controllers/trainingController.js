@@ -114,6 +114,70 @@ const get_weekly_training = (req, res, next) => {
   );
 };
 
+const get_list_every_exercise = (req, res, next) => {
+  Training.find({})
+    .populate({
+      path: "user",
+      model: "User",
+      select: "_id firstName lastName profilePicture"
+    })
+    .exec(function (err, data) {
+      if (err) return next(err);
+
+      let exerciseCounts = {};
+
+      data.forEach((day) => {
+        day.training.forEach((set) => {
+          set.forEach((exercise) => {
+            if (exercise.exercise) {
+              let exerciseName = exercise.exercise;
+              if (!exerciseCounts[exerciseName]) {
+                exerciseCounts[exerciseName] = {
+                  count: 0,
+                  dates: [],
+                  uniqueUsers: new Set(),  // Using a Set to track unique user IDs
+                  users: []  // This will store the user objects for unique users
+                };
+              }
+
+              exerciseCounts[exerciseName].count++;
+              exerciseCounts[exerciseName].dates.push({
+                date: day.date,
+                user: day.user
+              });
+
+              // Check and add unique user
+              const userId = day.user?._id.toString();
+              if (!exerciseCounts[exerciseName].uniqueUsers.has(userId)) {
+                exerciseCounts[exerciseName].uniqueUsers.add(userId);
+                exerciseCounts[exerciseName].users.push(day.user);
+              }
+            }
+          });
+        });
+      });
+
+      // Convert to array and sort by count
+      let exerciseList = Object.keys(exerciseCounts).map((key) => {
+        const exercise = exerciseCounts[key];
+        return {
+          exercise: key,
+          count: exercise.count,
+          dates: exercise.dates,
+          users: exercise.users  // Include unique users for each exercise
+        };
+      }).sort((a, b) => b.count - a.count);
+
+      // Clean up to not send Set object
+      res.send(exerciseList.map(ex => ({
+        exercise: ex.exercise,
+        count: ex.count,
+        dates: ex.dates,
+        users: ex.users
+      })));
+    });
+};
+
 const get_exercise_list = (req, res, next) => {
   Training.find({ user: res.locals.user._id }, function (err, data) {
     if (err) return next(err);
@@ -405,6 +469,46 @@ const workout_month_request = async (req, res, next) => {
   }
 };
 
+const update_master_exercise_name = async (req, res, next) => {
+  const { incorrectExercise, correctExercise } = req.body;
+
+  try {
+    const data = await Training.find({ });
+
+    const changelog = [];
+
+    data.forEach((day) => {
+      day.training.forEach((set) => {
+        set.forEach((exercise) => {
+          if (exercise.exercise === incorrectExercise) {
+            changelog.push(`${day.date} | ${exercise.exercise}`);
+            exercise.exercise = correctExercise;
+          }
+        });
+      });
+    });
+
+    // Save the modified documents back to the database
+    const savePromises = data.map((day) => day.save());
+    await Promise.all(savePromises);
+
+    res.send({
+      statusCode: 200,
+      details: {
+        body: [
+          {
+            message: "Exercises updated successfully",
+            removed: incorrectExercise,
+          },
+        ],
+      },
+    });
+  } catch (err) {
+    console.error("Error occurred:", err);
+    return next(err);
+  }
+};
+
 const update_exercise_name = async (req, res, next) => {
   const { incorrectExercise, correctExercise } = req.body;
 
@@ -483,6 +587,7 @@ module.exports = {
   get_workouts_by_date,
   update_training,
   get_weekly_training,
+  get_list_every_exercise,
   get_exercise_list,
   get_exercise_history,
   copy_workout_by_id,
@@ -490,5 +595,6 @@ module.exports = {
   delete_workout_by_id,
   workout_history_request,
   workout_month_request,
+  update_master_exercise_name,
   update_exercise_name,
 };
