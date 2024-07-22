@@ -83,6 +83,7 @@ const get_my_relationships = async (req, res, next) => {
             firstName: t.firstName,
             lastName: t.lastName,
             trainer: t._id,
+            profilePicture: t.profilePicture,
             accepted,
         }
     })
@@ -110,16 +111,26 @@ const get_my_clients = async (req, res, next) => {
 }
 
 const remove_relationship = (req, res, next) => {
-    const { trainer } = req.body;
-    Relationship.findOneAndDelete({ client: res.locals.user._id, trainer, }, function (err, data) {
-        if (err) {
-            res.send({ error: err })
-        }
-        else {
-            res.sendStatus(200);
-        }
-    })
-}
+    const { trainer, client } = req.body;
+    const userId = res.locals.user._id;
+
+    // Ensure that the request is made by either the trainer or the client
+    if (trainer === userId || client === userId) {
+        Relationship.findOneAndDelete({ client, trainer }, (err, data) => {
+            if (err) {
+                // Consider sending a more specific status code depending on error
+                res.status(500).send({ error: "Server error occurred." });
+            } else if (!data) {
+                // Handle case where no document is found
+                res.status(404).send({ message: "Relationship not found." });
+            } else {
+                res.sendStatus(200);  // Successfully deleted
+            }
+        });
+    } else {
+        res.status(403).send({ error: 'This request must include your own ID.' });
+    }
+};
 
 module.exports = {
     manage_relationship,

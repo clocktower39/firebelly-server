@@ -188,6 +188,7 @@ const get_trainers = (req, res, next) => {
     if (err) return next(err);
     const publicTrainers = trainers.map((trainer) => ({
       trainer: trainer._id,
+      profilePicture: trainer.profilePicture,
       firstName: trainer.firstName,
       lastName: trainer.lastName,
       sex: trainer.sex,

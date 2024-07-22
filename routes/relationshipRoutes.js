@@ -5,14 +5,14 @@ const { validate, Joi } = require('express-validation');
 
 const relationshipValidate = {
     body: Joi.object({
-        trainerId: Joi.string()
+        trainer: Joi.string()
             .required(),
     }),
 }
 
 const relationshipStatus = {
     body: Joi.object({
-        clientId: Joi.string()
+        client: Joi.string()
             .required(),
         accepted: Joi.bool()
             .required(),
@@ -27,6 +27,6 @@ router.get('/relationships/myTrainers', verifyAccessToken, relationshipControlle
 router.get('/relationships/myClients', verifyAccessToken, relationshipController.get_my_clients);
 router.post('/changeRelationshipStatus', validate(relationshipStatus, {}, {}), verifyAccessToken, relationshipController.change_relationship_status);
 router.post('/manageRelationship', validate(relationshipValidate, {}, {}), verifyAccessToken, relationshipController.manage_relationship);
-router.post('/removeRelationship', validate(relationshipValidate, {}, {}), verifyAccessToken, relationshipController.remove_relationship);
+router.post('/removeRelationship', verifyAccessToken, relationshipController.remove_relationship);
 
 module.exports = router;
