@@ -143,7 +143,8 @@ const get_list_every_exercise = (req, res, next) => {
               exerciseCounts[exerciseName].count++;
               exerciseCounts[exerciseName].dates.push({
                 date: day.date,
-                user: day.user
+                user: day.user,
+                trainingId: day._id,
               });
 
               // Check and add unique user
@@ -470,10 +471,14 @@ const workout_month_request = async (req, res, next) => {
 };
 
 const update_master_exercise_name = async (req, res, next) => {
-  const { incorrectExercise, correctExercise } = req.body;
+  const { incorrectExercise, correctExercise, trainingIdList } = req.body;
 
   try {
-    const data = await Training.find({ });
+    // Ensure the IDs are converted to ObjectId if they are not already
+    const objectIdList = trainingIdList.map(id => mongoose.Types.ObjectId(id));
+
+    // Fetch only the documents that match the IDs in trainingIdList
+    const data = await Training.find({ _id: { $in: objectIdList } });
 
     const changelog = [];
 
@@ -482,7 +487,7 @@ const update_master_exercise_name = async (req, res, next) => {
         set.forEach((exercise) => {
           if (exercise.exercise === incorrectExercise) {
             changelog.push(`${day.date} | ${exercise.exercise}`);
-            exercise.exercise = correctExercise;
+            exercise.exercise = correctExercise; // Update the exercise name
           }
         });
       });
