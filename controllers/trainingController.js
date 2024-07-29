@@ -472,6 +472,9 @@ const workout_month_request = async (req, res, next) => {
 
 const update_master_exercise_name = async (req, res, next) => {
   const { incorrectExercise, correctExercise, trainingIdList } = req.body;
+  if (res.locals.user._id.toString() !== '612198502f4d5273b466b4e4' || res.locals.user._id.toString() !== '613d0935341e9f055c320d81') {
+    return res.status(403).send({ error: 'Restricted' });
+  }
 
   try {
     // Ensure the IDs are converted to ObjectId if they are not already
