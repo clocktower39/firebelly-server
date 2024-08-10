@@ -119,7 +119,7 @@ const get_list_every_exercise = (req, res, next) => {
     .populate({
       path: "user",
       model: "User",
-      select: "_id firstName lastName profilePicture"
+      select: "_id firstName lastName profilePicture",
     })
     .exec(function (err, data) {
       if (err) return next(err);
@@ -135,8 +135,8 @@ const get_list_every_exercise = (req, res, next) => {
                 exerciseCounts[exerciseName] = {
                   count: 0,
                   dates: [],
-                  uniqueUsers: new Set(),  // Using a Set to track unique user IDs
-                  users: []  // This will store the user objects for unique users
+                  uniqueUsers: new Set(), // Using a Set to track unique user IDs
+                  users: [], // This will store the user objects for unique users
                 };
               }
 
@@ -159,68 +159,87 @@ const get_list_every_exercise = (req, res, next) => {
       });
 
       // Convert to array and sort by count
-      let exerciseList = Object.keys(exerciseCounts).map((key) => {
-        const exercise = exerciseCounts[key];
-        return {
-          exercise: key,
-          count: exercise.count,
-          dates: exercise.dates,
-          users: exercise.users  // Include unique users for each exercise
-        };
-      }).sort((a, b) => b.count - a.count);
+      let exerciseList = Object.keys(exerciseCounts)
+        .map((key) => {
+          const exercise = exerciseCounts[key];
+          return {
+            exercise: key,
+            count: exercise.count,
+            dates: exercise.dates,
+            users: exercise.users, // Include unique users for each exercise
+          };
+        })
+        .sort((a, b) => b.count - a.count);
 
       // Clean up to not send Set object
-      res.send(exerciseList.map(ex => ({
-        exercise: ex.exercise,
-        count: ex.count,
-        dates: ex.dates,
-        users: ex.users
-      })));
+      res.send(
+        exerciseList.map((ex) => ({
+          exercise: ex.exercise,
+          count: ex.count,
+          dates: ex.dates,
+          users: ex.users,
+        }))
+      );
     });
 };
 
 const get_exercise_list = (req, res, next) => {
-  Training.find({ user: res.locals.user._id }, function (err, data) {
+  const { user } = req.body;
+
+  Training.find({ user }, async function (err, data) {
     if (err) return next(err);
 
     let exerciseList = [];
+    const relationship = await checkClientRelationship(res.locals.user._id, user?._id);
 
-    data.map((day) => {
-      day.training.map((set) => {
-        set.map((exercise) => {
-          if (
-            !exerciseList
-              .map((ex) => (typeof ex === "string" ? ex.toLowerCase() : ex))
-              .includes(
-                typeof exercise.exercise === "string" ? exercise.exercise.toLowerCase() : ""
-              )
-          ) {
-            exerciseList.push(exercise.exercise);
-          }
+    if (res.locals.user._id === user._id || relationship?.accepted) {
+      data.map((day) => {
+        day.training.map((set) => {
+          set.map((exercise) => {
+            if (
+              !exerciseList
+                .map((ex) => (typeof ex === "string" ? ex.toLowerCase() : ex))
+                .includes(
+                  typeof exercise.exercise === "string" ? exercise.exercise.toLowerCase() : ""
+                )
+            ) {
+              exerciseList.push(exercise.exercise);
+            }
+          });
         });
       });
-    });
-    res.send(exerciseList);
+      res.send(exerciseList);
+    } else {
+      res.send({ error: "Restricted" });
+    }
   });
 };
 
 const get_exercise_history = (req, res, next) => {
-  Training.find({ user: res.locals.user._id }, function (err, data) {
+  const { user } = req.body;
+
+  Training.find({ user: user._id }, async function (err, data) {
     if (err) return next(err);
 
     let historyList = [];
+    const relationship = await checkClientRelationship(res.locals.user._id, user._id);
 
-    data.map((day) => {
-      day.training.map((set) => {
-        let targetedExercise = set.filter(
-          (exercise) => exercise?.exercise?.toLowerCase() === req.body.targetExercise.toLowerCase()
-        );
-        if (targetedExercise.length > 0) {
-          historyList.push({ ...targetedExercise[0], date: day.date });
-        }
+    if (res.locals.user._id === user._id || relationship?.accepted) {
+      data.map((day) => {
+        day.training.map((set) => {
+          let targetedExercise = set.filter(
+            (exercise) =>
+              exercise?.exercise?.toLowerCase() === req.body.targetExercise.toLowerCase()
+          );
+          if (targetedExercise.length > 0) {
+            historyList.push({ ...targetedExercise[0], date: day.date });
+          }
+        });
       });
-    });
-    res.send(historyList);
+      res.send(historyList);
+    } else {
+      res.send({ error: "Restricted" });
+    }
   })
     .lean()
     .exec();
@@ -472,13 +491,16 @@ const workout_month_request = async (req, res, next) => {
 
 const update_master_exercise_name = async (req, res, next) => {
   const { incorrectExercise, correctExercise, trainingIdList } = req.body;
-  if (res.locals.user._id.toString() !== '612198502f4d5273b466b4e4' || res.locals.user._id.toString() !== '613d0935341e9f055c320d81') {
-    return res.status(403).send({ error: 'Restricted' });
+  if (
+    res.locals.user._id.toString() !== "612198502f4d5273b466b4e4" ||
+    res.locals.user._id.toString() !== "613d0935341e9f055c320d81"
+  ) {
+    return res.status(403).send({ error: "Restricted" });
   }
 
   try {
     // Ensure the IDs are converted to ObjectId if they are not already
-    const objectIdList = trainingIdList.map(id => mongoose.Types.ObjectId(id));
+    const objectIdList = trainingIdList.map((id) => mongoose.Types.ObjectId(id));
 
     // Fetch only the documents that match the IDs in trainingIdList
     const data = await Training.find({ _id: { $in: objectIdList } });
@@ -558,21 +580,6 @@ const update_exercise_name = async (req, res, next) => {
 };
 
 const checkClientRelationship = (trainerId, clientId) => {
-  // try {
-  //   const relationshipResult = await checkClientRelationship(
-  //     res.locals.user._id,
-  //     req.body.client
-  //   );
-
-  //   if (relationshipResult.accepted) {
-  // insert function here
-  //   } else {
-  //     res.send(relationshipResult);
-  //   }
-  // } catch (error) {
-  //   next(error);
-  // }
-
   return new Promise((resolve, reject) => {
     Relationship.findOne({ trainer: trainerId, client: clientId }, (err, relationship) => {
       if (err) {

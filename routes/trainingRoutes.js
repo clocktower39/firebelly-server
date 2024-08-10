@@ -8,6 +8,8 @@ const exerciseHistoryValidate = {
     body: Joi.object({
         targetExercise: Joi.string()
             .required(),
+        user: Joi.object()
+            .required(),
     }),
 }
 
@@ -18,7 +20,7 @@ router.post('/createTraining', verifyAccessToken, trainingController.create_trai
 router.post('/trainingWeek', verifyAccessToken, trainingController.get_weekly_training);
 router.post('/exerciseHistory', verifyAccessToken, validate(exerciseHistoryValidate, {}, {}), trainingController.get_exercise_history);
 router.get('/exerciseList', verifyAccessToken, trainingController.get_list_every_exercise);
-router.get('/myExerciseList', verifyAccessToken, trainingController.get_exercise_list);
+router.post('/myExerciseList', verifyAccessToken, trainingController.get_exercise_list);
 router.post('/copyWorkoutById', verifyAccessToken, trainingController.copy_workout_by_id);
 router.post('/updateWorkoutDateById', verifyAccessToken, trainingController.update_workout_date_by_id);
 router.post('/deleteWorkoutById', verifyAccessToken, trainingController.delete_workout_by_id);
