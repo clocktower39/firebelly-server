@@ -86,10 +86,16 @@ const get_workout_queue = (req, res, next) => {
 };
 
 const get_workouts_by_date = (req, res, next) => {
-  Training.find({ user: res.locals.user._id, date: req.body.date }, function (err, data) {
+  Training.find({ user: res.locals.user._id, date: req.body.date })
+  .populate({
+    path: "user",
+    model: "User",
+    select: "_id firstName lastName profilePicture",
+  })
+  .exec(function (err, data) {
     if (err) return next(err);
     res.send(data);
-  });
+  })
 };
 
 const get_weekly_training = (req, res, next) => {
