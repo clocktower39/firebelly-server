@@ -72,6 +72,7 @@ const trainingSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    complete: { type: Boolean, default: false },
   },
   { minimize: false }
 );
