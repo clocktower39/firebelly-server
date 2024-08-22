@@ -55,15 +55,40 @@ app.use('/', relationshipRoutes);
 app.use('/', goalRoutes);
 app.use('/', conversationRoutes);
 
-global.io.on('connection', (socket) => {
-    console.log(socket.conn.remoteAddress)
-    console.log('a user connected')
-});
+const connectedClients = {};
 
 global.io.on('connection', (socket) => {
-    console.log(socket.conn.remoteAddress)
-    console.log('a user connected')
+    const userId = socket.handshake.query.userId;
+
+    // Save the user's socket ID
+    connectedClients[userId] = socket.id;
+    
+    // Notify all trainers about the client's online status
+    global.io.emit('clientStatusChanged', { userId, status: 'online' });
+
+    console.log(`${userId} connected with IP: ${socket.conn.remoteAddress}`);
+
+    // Listen for the 'requestClientStatuses' event and send the current status
+    socket.on('requestClientStatuses', () => {
+        const clientStatuses = Object.keys(connectedClients).reduce((statuses, id) => {
+            statuses[id] = 'online';
+            return statuses;
+        }, {});
+        socket.emit('currentClientStatuses', clientStatuses);
+    });
+
+    socket.on('disconnect', () => {
+        // Remove the client from the connectedClients object
+        delete connectedClients[userId];
+        
+        // Notify all trainers about the client's offline status
+        global.io.emit('clientStatusChanged', { userId, status: 'offline' });
+
+        console.log(`${userId} disconnected`);
+    });
 });
+
+
 
 mongoose.connect(dbUrl, 
     {
