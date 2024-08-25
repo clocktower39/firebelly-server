@@ -299,6 +299,7 @@ const copy_workout_by_id = (req, res, next) => {
     if (newAccount) data.user = newAccount;
     switch (option) {
       case "achievedToNewGoal":
+        data.complete = false;
         data.training.map((set) => {
           set.map((exercise) => {
             // Loop through and move correlated achieved to goals
@@ -322,6 +323,7 @@ const copy_workout_by_id = (req, res, next) => {
         });
         break;
       case "copyGoalOnly":
+        data.complete = false;
         data.training.map((set) => {
           set.map((exercise) => {
             exercise.notes = [];
