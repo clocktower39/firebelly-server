@@ -20,143 +20,135 @@ const createTokens = (user) => {
 const signup_user = (req, res, next) => {
   let user = new User(req.body);
   let saveUser = () => {
-    user.save((err) => {
-      if (err) return next(err);
-      // Create and send new tokens on successful signup
-      const tokens = createTokens(user);
-      res.send({
-        status: "success",
-        user,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-      });
-    });
+    user.save()
+      .then(() => {
+        const tokens = createTokens(user);
+        res.send({
+          status: "success",
+          user,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+        });
+      })
+      .catch((err) => next(err));
   };
   saveUser();
 };
 
 const login_user = (req, res, next) => {
-  User.findOne({ email: req.body.email }, function (err, user) {
-    if (err) return next(err);
-    if (!user) {
-      res.send({
-        authenticated: false,
-        error: { email: "Username not found" },
-      });
-    } else {
-      user.comparePassword(req.body.password, function (err, isMatch) {
-        if (err) {
-          res.send({
-            authenticated: false,
-          });
-        }
-        //if the password does not match and previous session was not authenticated, do not authenticate
-        if (isMatch) {
-          // Create and send new tokens on successful login
-          const tokens = createTokens(user);
-          res.send({
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
-          });
-        } else {
-          res.send({
-            error: { password: "Incorrect Password" },
-          });
-        }
-      });
-    }
-  });
+  User.findOne({ email: req.body.email })
+    .then((user) => {
+      if (!user) {
+        res.send({
+          authenticated: false,
+          error: { email: "Username not found" },
+        });
+      } else {
+        user.comparePassword(req.body.password)
+          .then((isMatch) => {
+            if (isMatch) {
+              const tokens = createTokens(user);
+              res.send({
+                accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
+              });
+            } else {
+              res.send({
+                error: { password: "Incorrect Password" },
+              });
+            }
+          })
+          .catch(() => res.send({ authenticated: false }));
+      }
+    })
+    .catch((err) => next(err));
 };
 
-const refresh_tokens = async (req, res, next) => {
+const refresh_tokens = (req, res, next) => {
   const { refreshToken } = req.body;
 
-  try {
-    const verifiedRefreshToken = await verifyRefreshToken(refreshToken);
-    const user = await User.findById(verifiedRefreshToken._id).exec();
+  verifyRefreshToken(refreshToken)
+    .then((verifiedRefreshToken) => {
+      return User.findById(verifiedRefreshToken._id).exec();
+    })
+    .then((user) => {
+      if (!user) {
+        return res.status(404).send({ error: "User not found" });
+      }
 
-    if (!user) {
-      // Handle case when user is not found
-      return res.status(404).send({ error: "User not found" });
-    }
-
-    const tokens = createTokens(user);
-
-    res.send({
-      accessToken: tokens.accessToken,
-    });
-  } catch (err) {
-    res.status(403).send({ error: "Invalid refresh token", err });
-  }
+      const tokens = createTokens(user);
+      res.send({
+        accessToken: tokens.accessToken,
+      });
+    })
+    .catch((err) => res.status(403).send({ error: "Invalid refresh token", err }));
 };
 
 const change_password = (req, res, next) => {
-  User.findOne({ email: res.locals.user.email }, function (err, user) {
-    if (err) return next(err);
-    if (!user) {
-      res.send({
-        error: { status: "User not found" },
-      });
-    } else {
-      user.comparePassword(req.body.currentPassword, function (err, isMatch) {
-        if (err) {
-          res.send({
-            error: err,
-          });
-        }
-        if (isMatch) {
-          user.password = req.body.newPassword;
-          user.save().then((savedUser) => {
-            const tokens = createTokens(user);
-            res.send({
-              status: "success",
-              user,
-              accessToken: tokens.accessToken,
+  User.findOne({ email: res.locals.user.email })
+    .then((user) => {
+      if (!user) {
+        res.send({
+          error: { status: "User not found" },
+        });
+      } else {
+        return user.comparePassword(req.body.currentPassword).then((isMatch) => {
+          if (isMatch) {
+            user.password = req.body.newPassword;
+            return user.save().then((savedUser) => {
+              const tokens = createTokens(savedUser);
+              res.send({
+                status: "success",
+                user: savedUser,
+                accessToken: tokens.accessToken,
+              });
             });
-          });
-        } else {
-          res.send({
-            name: "Validation Failed",
-            message: "Validation Failed",
-            statusCode: 400,
-            error: "Bad Request",
-            details: { 
-              body: [
-                {
-                  message: "Incorrect Current Password.",
-                  path: ['currentPassword'],
-                  context: {
-                    label: "currentPassword",
-                    value: "",
-                    key: "currentPassword",
+          } else {
+            res.send({
+              name: "Validation Failed",
+              message: "Validation Failed",
+              statusCode: 400,
+              error: "Bad Request",
+              details: {
+                body: [
+                  {
+                    message: "Incorrect Current Password.",
+                    path: ["currentPassword"],
+                    context: {
+                      label: "currentPassword",
+                      value: "",
+                      key: "currentPassword",
+                    },
                   },
-                },
-              ],
-              status: "Incorrect Current Password." },
-          });
-        }
-      });
-    }
-  });
+                ],
+                status: "Incorrect Current Password.",
+              },
+            });
+          }
+        });
+      }
+    })
+    .catch((err) => next(err));
 };
 
 const update_user = (req, res, next) => {
-  User.findByIdAndUpdate(res.locals.user._id, { ...req.body }, { new: true }, function (err, user) {
-    if (err) return next(err);
-    if (!user) {
-      res.send({
-        status: "error",
-        err: err ? err : "",
-      });
-    } else {
-      const tokens = createTokens(user);
-      res.send({
-        status: "success",
-        user,
-        accessToken: tokens.accessToken,
-      });
-    }
-  });
+  User.findByIdAndUpdate(res.locals.user._id, { ...req.body }, { new: true })
+    .then((user) => {
+      if (!user) {
+        res.send({
+          status: "error",
+          err: "",
+        });
+      } else {
+        const tokens = createTokens(user);
+        res.send({
+          status: "success",
+          user,
+          accessToken: tokens.accessToken,
+        });
+      }
+    })
+    .catch((err) => next(err));
 };
 
 const checkAuthLoginToken = (req, res, next) => {
@@ -165,88 +157,93 @@ const checkAuthLoginToken = (req, res, next) => {
 
 const get_userInfo = (req, res, next) => {
   if (req.body._id.length === 24) {
-    User.findById({ _id: req.body._id }, function (err, user) {
-      if (err) return next(err);
-      if (!user) {
-        res.send({
-          error: "User not found",
-        });
-      } else {
-        res.send({
-          firstName: user.firstName,
-          lastName: user.lastName,
-        });
-      }
-    });
+    User.findById({ _id: req.body._id })
+      .then((user) => {
+        if (!user) {
+          res.send({
+            error: "User not found",
+          });
+        } else {
+          res.send({
+            firstName: user.firstName,
+            lastName: user.lastName,
+          });
+        }
+      })
+      .catch((err) => next(err));
   } else {
     res.send({ error: "ID not valid" });
   }
 };
 
 const get_trainers = (req, res, next) => {
-  User.find({ isTrainer: true }, function (err, trainers) {
-    if (err) return next(err);
-    const publicTrainers = trainers.map((trainer) => ({
-      trainer: trainer._id,
-      profilePicture: trainer.profilePicture,
-      firstName: trainer.firstName,
-      lastName: trainer.lastName,
-      sex: trainer.sex,
-    }));
-    res.send(publicTrainers);
-  });
-};
-const upload_profile_picture = (req, res) => {
-  let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
-    bucketName: "profilePicture",
-  });
-
-  User.findById(res.locals.user._id, (err, user) => {
-    if (err) return res.send(err);
-    if (user.profilePicture) {
-      gridfsBucket.delete(mongoose.Types.ObjectId(user.profilePicture));
-    }
-    user.profilePicture = res.req.file.id;
-    user.save((err, u) => {
-      if (err) return res.send(err);
-      const tokens = createTokens(u);
-
-      return res.status(200).json({
-        accessToken: tokens.accessToken,
-      });
-    });
-  });
+  User.find({ isTrainer: true })
+    .then((trainers) => {
+      const publicTrainers = trainers.map((trainer) => ({
+        trainer: trainer._id,
+        profilePicture: trainer.profilePicture,
+        firstName: trainer.firstName,
+        lastName: trainer.lastName,
+        sex: trainer.sex,
+      }));
+      res.send(publicTrainers);
+    })
+    .catch((err) => next(err));
 };
 
-const get_profile_picture = (req, res) => {
-  if (req.params.id) {
-    let gridfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+const upload_profile_picture = async (req, res) => {
+  try {
+    const connection = await mongoose.connection;
+    const db = connection.getClient().db();
+    let gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
       bucketName: "profilePicture",
     });
 
-    gridfsBucket.find({ _id: mongoose.Types.ObjectId(req.params.id) }).toArray((err, files) => {
-      // Check if files
-      if (!files || files.length === 0) {
-        return res.status(404).json({
-          err: "No files exist",
-        });
-      }
+    const user = await User.findById(res.locals.user._id);
+    if (!user) {
+      return res.status(404).send({ error: "User not found" });
+    }
 
-      // Check if image
-      if (files[0].contentType === "image/jpeg" || files[0].contentType === "image/png") {
-        // Read output to browser
-        const readstream = gridfsBucket.openDownloadStream(files[0]._id);
-        readstream.pipe(res);
-      } else {
-        res.status(404).json({
-          err: "Not an image",
-        });
-      }
+    if (user.profilePicture) {
+      await gridfsBucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
+    }
+
+    user.profilePicture = new mongoose.Types.ObjectId(req.file.id);
+    const savedUser = await user.save();
+    const tokens = createTokens(savedUser);
+
+    res.status(200).json({
+      accessToken: tokens.accessToken,
     });
-  } else {
-    res.status(404).json({
-      err: "Missing parameter",
+  } catch (err) {
+    res.status(500).send({ error: "Failed to upload profile picture", err });
+  }
+};
+
+const get_profile_picture = async (req, res) => {
+  try {
+    const connection = await mongoose.connection;
+    const db = connection.getClient().db();
+    let gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
+      bucketName: "profilePicture",
     });
+
+    const files = await gridfsBucket
+      .find({ _id: new mongoose.Types.ObjectId(req.params.id) })
+      .toArray();
+
+    if (!files || files.length === 0) {
+      return res.status(404).json({ error: "No profile picture found" });
+    }
+
+    if (files[0].contentType === "image/jpeg" || files[0].contentType === "image/png") {
+      const readstream = gridfsBucket.openDownloadStream(files[0]._id);
+      readstream.pipe(res);
+    } else {
+      res.status(404).json({ error: "File is not an image" });
+    }
+  } catch (err) {
+    res.status(500).send({ error: "Error retrieving profile picture", err });
   }
 };
 
@@ -255,19 +252,17 @@ const delete_profile_picture = (req, res) => {
     bucketName: "profilePicture",
   });
 
-  User.findById(res.locals.user._id, (err, user) => {
-    if (err) return res.send(err);
-    if (user.profilePicture) {
-      gridfsBucket.delete(mongoose.Types.ObjectId(user.profilePicture));
-      user.profilePicture = undefined;
-      user.save((err, u) => {
-        if (err) return res.send(err);
-        return res.sendStatus(200);
-      });
-    } else {
-      return res.sendStatus(204);
-    }
-  });
+  User.findById(res.locals.user._id)
+    .then((user) => {
+      if (user.profilePicture) {
+        gridfsBucket.delete(new mongoose.Types.ObjectId(user.profilePicture));
+        user.profilePicture = undefined;
+        return user.save().then(() => res.sendStatus(200));
+      } else {
+        return res.sendStatus(204);
+      }
+    })
+    .catch((err) => res.send(err));
 };
 
 module.exports = {

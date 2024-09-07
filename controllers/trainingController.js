@@ -8,30 +8,22 @@ const create_training = (req, res, next) => {
     ...req.body,
     user: res.locals.user._id,
   });
-  let saveTraining = () => {
-    training.save((err) => {
-      if (err) return next(err);
+  training.save()
+    .then((training) => {
       res.send({
         status: "success",
         training,
       });
-    });
-  };
-  saveTraining();
+    })
+    .catch((err) => next(err));
 };
 
 const update_training = (req, res, next) => {
-  Training.findByIdAndUpdate(
-    req.body._id,
-    { ...req.body.training },
-    { new: true },
-    (err, training) => {
-      if (err) return next(err);
-      else {
-        res.send({ training });
-      }
-    }
-  );
+  Training.findByIdAndUpdate(req.body._id, { ...req.body.training }, { new: true })
+    .then((training) => {
+      res.send({ training });
+    })
+    .catch((err) => next(err));
 };
 
 const get_training_by_id = (req, res, next) => {
@@ -46,56 +38,42 @@ const get_training_by_id = (req, res, next) => {
       model: "User",
       select: "_id firstName lastName profilePicture",
     })
-    .exec(function (err, data) {
-      if (err) return next(err);
-
+    .then((data) => {
       if (!data) {
         return res.status(404).json({ error: "Training not found." });
       }
 
-      // Check if the user requesting the data is the owner
       if (data.user._id.toString() === res.locals.user._id) {
         return res.send(data);
       }
 
-      // If not the owner, check the relationship
-      Relationship.findOne(
-        { trainer: res.locals.user._id, client: data.user._id },
-        (relationshipErr, relationship) => {
-          if (relationshipErr) return next(relationshipErr);
-
+      Relationship.findOne({ trainer: res.locals.user._id, client: data.user._id })
+        .then((relationship) => {
           if (!relationship || !relationship.accepted) {
             return res.status(403).json({ error: "Unauthorized access." });
           }
-
-          // If the relationship is accepted, send the data
           res.send(data);
-        }
-      );
-    });
+        })
+        .catch((err) => next(err));
+    })
+    .catch((err) => next(err));
 };
 
 const get_workout_queue = (req, res, next) => {
-  Training.find(
-    { user: res.locals.user._id, $or: [{ date: null }, { date: { $exists: false } }] },
-    function (err, data) {
-      if (err) return next(err);
-      res.send(data);
-    }
-  );
+  Training.find({ user: res.locals.user._id, $or: [{ date: null }, { date: { $exists: false } }] })
+    .then((data) => res.send(data))
+    .catch((err) => next(err));
 };
 
 const get_workouts_by_date = (req, res, next) => {
   Training.find({ user: res.locals.user._id, date: req.body.date })
-  .populate({
-    path: "user",
-    model: "User",
-    select: "_id firstName lastName profilePicture",
-  })
-  .exec(function (err, data) {
-    if (err) return next(err);
-    res.send(data);
-  })
+    .populate({
+      path: "user",
+      model: "User",
+      select: "_id firstName lastName profilePicture",
+    })
+    .then((data) => res.send(data))
+    .catch((err) => next(err));
 };
 
 const get_weekly_training = (req, res, next) => {
@@ -105,19 +83,15 @@ const get_weekly_training = (req, res, next) => {
   const endDate = new Date(selectedDate);
   endDate.setDate(endDate.getDate() + 1);
 
-  Training.find(
-    {
-      date: {
-        $gte: startDate,
-        $lt: endDate,
-      },
-      user: res.locals.user._id,
+  Training.find({
+    date: {
+      $gte: startDate,
+      $lt: endDate,
     },
-    function (err, data) {
-      if (err) return next(err);
-      res.send(data);
-    }
-  );
+    user: res.locals.user._id,
+  })
+    .then((data) => res.send(data))
+    .catch((err) => next(err));
 };
 
 const get_list_every_exercise = (req, res, next) => {
@@ -127,9 +101,7 @@ const get_list_every_exercise = (req, res, next) => {
       model: "User",
       select: "_id firstName lastName profilePicture",
     })
-    .exec(function (err, data) {
-      if (err) return next(err);
-
+    .then((data) => {
       let exerciseCounts = {};
 
       data.forEach((day) => {
@@ -141,8 +113,8 @@ const get_list_every_exercise = (req, res, next) => {
                 exerciseCounts[exerciseName] = {
                   count: 0,
                   dates: [],
-                  uniqueUsers: new Set(), // Using a Set to track unique user IDs
-                  users: [], // This will store the user objects for unique users
+                  uniqueUsers: new Set(),
+                  users: [],
                 };
               }
 
@@ -153,7 +125,6 @@ const get_list_every_exercise = (req, res, next) => {
                 trainingId: day._id,
               });
 
-              // Check and add unique user
               const userId = day.user?._id.toString();
               if (!exerciseCounts[exerciseName].uniqueUsers.has(userId)) {
                 exerciseCounts[exerciseName].uniqueUsers.add(userId);
@@ -164,7 +135,6 @@ const get_list_every_exercise = (req, res, next) => {
         });
       });
 
-      // Convert to array and sort by count
       let exerciseList = Object.keys(exerciseCounts)
         .map((key) => {
           const exercise = exerciseCounts[key];
@@ -172,12 +142,11 @@ const get_list_every_exercise = (req, res, next) => {
             exercise: key,
             count: exercise.count,
             dates: exercise.dates,
-            users: exercise.users, // Include unique users for each exercise
+            users: exercise.users,
           };
         })
         .sort((a, b) => b.count - a.count);
 
-      // Clean up to not send Set object
       res.send(
         exerciseList.map((ex) => ({
           exercise: ex.exercise,
@@ -186,69 +155,68 @@ const get_list_every_exercise = (req, res, next) => {
           users: ex.users,
         }))
       );
-    });
+    })
+    .catch((err) => next(err));
 };
 
 const get_exercise_list = (req, res, next) => {
   const { user } = req.body;
 
-  Training.find({ user }, async function (err, data) {
-    if (err) return next(err);
+  Training.find({ user })
+    .then(async (data) => {
+      let exerciseList = [];
+      const relationship = await checkClientRelationship(res.locals.user._id, user?._id);
 
-    let exerciseList = [];
-    const relationship = await checkClientRelationship(res.locals.user._id, user?._id);
-
-    if (res.locals.user._id === user._id || relationship?.accepted) {
-      data.map((day) => {
-        day.training.map((set) => {
-          set.map((exercise) => {
-            if (
-              !exerciseList
-                .map((ex) => (typeof ex === "string" ? ex.toLowerCase() : ex))
-                .includes(
-                  typeof exercise.exercise === "string" ? exercise.exercise.toLowerCase() : ""
-                )
-            ) {
-              exerciseList.push(exercise.exercise);
-            }
+      if (res.locals.user._id === user._id || relationship?.accepted) {
+        data.map((day) => {
+          day.training.map((set) => {
+            set.map((exercise) => {
+              if (
+                !exerciseList
+                  .map((ex) => (typeof ex === "string" ? ex.toLowerCase() : ex))
+                  .includes(
+                    typeof exercise.exercise === "string" ? exercise.exercise.toLowerCase() : ""
+                  )
+              ) {
+                exerciseList.push(exercise.exercise);
+              }
+            });
           });
         });
-      });
-      res.send(exerciseList);
-    } else {
-      res.send({ error: "Restricted" });
-    }
-  });
+        res.send(exerciseList);
+      } else {
+        res.send({ error: "Restricted" });
+      }
+    })
+    .catch((err) => next(err));
 };
 
 const get_exercise_history = (req, res, next) => {
   const { user } = req.body;
 
-  Training.find({ user: user._id }, async function (err, data) {
-    if (err) return next(err);
+  Training.find({ user: user._id }).lean().exec()
+    .then(async (data) => {
+      let historyList = [];
+      const relationship = await checkClientRelationship(res.locals.user._id, user._id);
 
-    let historyList = [];
-    const relationship = await checkClientRelationship(res.locals.user._id, user._id);
-
-    if (res.locals.user._id === user._id || relationship?.accepted) {
-      data.map((day) => {
-        day.training.map((set) => {
-          let targetedExercise = set.filter(
-            (exercise) =>
-              exercise?.exercise?.toLowerCase() === req.body.targetExercise.toLowerCase()
-          );
-          if (targetedExercise.length > 0) {
-            historyList.push({ ...targetedExercise[0], date: day.date });
-          }
+      if (res.locals.user._id === user._id || relationship?.accepted) {
+        data.map((day) => {
+          day.training.map((set) => {
+            let targetedExercise = set.filter(
+              (exercise) =>
+                exercise?.exercise?.toLowerCase() === req.body.targetExercise.toLowerCase()
+            );
+            if (targetedExercise.length > 0) {
+              historyList.push({ ...targetedExercise[0], date: day.date });
+            }
+          });
         });
-      });
-      res.send(historyList);
-    } else {
-      res.send({ error: "Restricted" });
-    }
-  })
-    .lean()
-    .exec();
+        res.send(historyList);
+      } else {
+        res.send({ error: "Restricted" });
+      }
+    })
+    .catch((err) => next(err));
 };
 
 const update_workout_date_by_id = async (req, res, next) => {
@@ -297,13 +265,12 @@ const copy_workout_by_id = (req, res, next) => {
   const modifyWorkout = (data, newDate, _id, option, newTitle, newAccount) => {
     if (newTitle) data.title = newTitle;
     if (newAccount) data.user = newAccount;
+
     switch (option) {
       case "achievedToNewGoal":
         data.complete = false;
-        data.training.map((set) => {
-          set.map((exercise) => {
-            // Loop through and move correlated achieved to goals
-            // Still need to restructure training model and remove unused properties
+        data.training.forEach((set) => {
+          set.forEach((exercise) => {
             exercise.goals.exactReps = exercise.achieved.reps;
             exercise.goals.weight = exercise.achieved.weight;
             exercise.goals.percent = exercise.achieved.percent;
@@ -312,138 +279,112 @@ const copy_workout_by_id = (req, res, next) => {
 
             for (const prop in exercise.achieved) {
               if (Array.isArray(exercise.achieved[prop])) {
-                exercise.achieved[prop] = exercise.achieved[prop].map((v) => {
-                  return "0";
-                });
+                exercise.achieved[prop] = exercise.achieved[prop].map(() => "0");
               }
             }
-            return exercise;
           });
-          return set;
         });
         break;
       case "copyGoalOnly":
         data.complete = false;
-        data.training.map((set) => {
-          set.map((exercise) => {
+        data.training.forEach((set) => {
+          set.forEach((exercise) => {
             exercise.notes = [];
             for (const prop in exercise.achieved) {
               if (Array.isArray(exercise.achieved[prop])) {
-                exercise.achieved[prop] = exercise.achieved[prop].map((v) => {
-                  return "0";
-                });
+                exercise.achieved[prop] = exercise.achieved[prop].map(() => "0");
               }
             }
-            return exercise;
           });
-          return set;
         });
         break;
       case "exact":
-        data.training.map((set) => {
-          set.map((exercise) => {
+        data.training.forEach((set) => {
+          set.forEach((exercise) => {
             exercise.notes = [];
-            return exercise;
           });
-          return set;
         });
         break;
     }
 
-    data._id = mongoose.Types.ObjectId();
+    data._id = new mongoose.Types.ObjectId();
     data.isNew = true;
     data.date = newDate;
-    data.save((err) => {
-      if (err) return next(err);
-      res.send({
-        status: "Copy Successful",
-      });
-    });
+    data.save()
+      .then(() => {
+        res.send({
+          status: "Copy Successful",
+        });
+      })
+      .catch((err) => next(err));
   };
 
-  Training.findOne({ _id }, function (err, data) {
-    if (err) return next(err);
+  Training.findOne({ _id })
+    .then((data) => {
+      if (!data) return res.status(404).json({ error: "Training not found." });
 
-    // Check if the user requesting the data is the owner
-    if (data.user._id.toString() === res.locals.user._id) {
-      return modifyWorkout(data, newDate, _id, option, newTitle, newAccount);
-    }
-
-    // If not the owner, check the relationship
-    Relationship.findOne(
-      { trainer: res.locals.user._id, client: data.user._id },
-      (relationshipErr, relationship) => {
-        if (relationshipErr) return next(relationshipErr);
-
-        if (!relationship || !relationship.accepted) {
-          return res.status(403).json({ error: "Unauthorized access." });
-        }
-
-        // If the relationship is accepted, send the data
-        modifyWorkout(data, newDate, _id, option, newTitle, newAccount);
+      if (data.user._id.toString() === res.locals.user._id) {
+        return modifyWorkout(data, newDate, _id, option, newTitle, newAccount);
       }
-    );
-  });
+
+      Relationship.findOne({ trainer: res.locals.user._id, client: data.user._id })
+        .then((relationship) => {
+          if (!relationship || !relationship.accepted) {
+            return res.status(403).json({ error: "Unauthorized access." });
+          }
+          modifyWorkout(data, newDate, _id, option, newTitle, newAccount);
+        })
+        .catch((err) => next(err));
+    })
+    .catch((err) => next(err));
 };
 
 const delete_workout_by_id = (req, res, next) => {
   const workoutId = req.body._id;
 
   const performDeletion = (workoutId, res) => {
-    Training.findOneAndDelete({ _id: workoutId }, (err, data) => {
-      if (err) {
-        return res.status(500).json({ error: err });
-      }
+    Training.findOneAndDelete({ _id: workoutId })
+      .then((data) => {
+        if (!data) {
+          return res.status(404).json({ error: "Training not found." });
+        }
+        res.send({ status: "Record deleted" });
+      })
+      .catch((err) => res.status(500).json({ error: err }));
+  };
 
+  Training.findOne({ _id: workoutId })
+    .then((data) => {
       if (!data) {
         return res.status(404).json({ error: "Training not found." });
       }
 
-      res.send({ status: "Record deleted" });
-    });
-  };
-
-  Training.findOne({ _id: workoutId }, (err, data) => {
-    if (err) {
-      return res.status(500).json({ error: err });
-    }
-
-    if (!data) {
-      return res.status(404).json({ error: "Training not found." });
-    }
-
-    // Check if the user requesting the deletion is the owner
-    if (data.user._id.toString() === res.locals.user._id) {
-      performDeletion(workoutId, res);
-    } else {
-      // If not the owner, check the relationship
-      Relationship.findOne(
-        { trainer: res.locals.user._id, client: data.user._id },
-        (relationshipErr, relationship) => {
-          if (relationshipErr) return next(relationshipErr);
-
-          if (!relationship || !relationship.accepted) {
-            return res.status(403).json({ error: "Unauthorized access." });
-          }
-
-          // If the relationship is accepted, perform the deletion
-          performDeletion(workoutId, res);
-        }
-      );
-    }
-  });
+      if (data.user._id.toString() === res.locals.user._id) {
+        performDeletion(workoutId, res);
+      } else {
+        Relationship.findOne({ trainer: res.locals.user._id, client: data.user._id })
+          .then((relationship) => {
+            if (!relationship || !relationship.accepted) {
+              return res.status(403).json({ error: "Unauthorized access." });
+            }
+            performDeletion(workoutId, res);
+          })
+          .catch((err) => next(err));
+      }
+    })
+    .catch((err) => res.status(500).json({ error: err }));
 };
 
 const workout_history_request = async (req, res, next) => {
-  const page = parseInt(req.body.page) || 1; // Get the requested page number from the request body
-  const limit = 15; // Set the number of trainings per page
+  const page = parseInt(req.body.page) || 1;
+  const limit = 15;
   const user = res.locals.user._id;
 
   try {
     const options = {
       page,
       limit,
-      sort: { date: -1 }, // Sort by date in descending order to get the most recent trainings first
+      sort: { date: -1 },
     };
 
     const result = await Training.paginate({ user }, options);
@@ -462,30 +403,23 @@ const workout_month_request = async (req, res, next) => {
   const trainer = res.locals.user._id;
 
   try {
-    // Parse the date sent by the client
     const clientDate = dayjs(req.body.date);
-
-    // Convert the client's date to UTC
     const clientDateUTC = clientDate.utc();
 
-    // Extract the year and month from the client's date
     const year = clientDateUTC.year();
-    const month = clientDateUTC.month() + 1; // Adding 1 because months are zero-indexed
+    const month = clientDateUTC.month() + 1;
 
-    // Use dayjs to construct a range for the specified month and year
     const startDate = dayjs.utc(`${year}-${month}-01`);
     const endDate = startDate.endOf("month");
 
-    // Query the Training collection to find entries within the specified month and year
     const data = await Training.find({
       user: isClientRequest ? user : trainer,
       date: {
-        $gte: startDate.toDate(), // Greater than or equal to the start of the month in UTC
-        $lte: endDate.toDate(), // Less than or equal to the end of the month in UTC
+        $gte: startDate.toDate(),
+        $lte: endDate.toDate(),
       },
     });
 
-    // If the user is the owner, or if it's a client request and the relationship is accepted, send the data
     if (user === trainer || (isClientRequest && (await checkClientRelationship(trainer, user)))) {
       res.json(data);
     } else {
@@ -499,18 +433,17 @@ const workout_month_request = async (req, res, next) => {
 
 const update_master_exercise_name = async (req, res, next) => {
   const { incorrectExercise, correctExercise, trainingIdList } = req.body;
+
   if (
-    res.locals.user._id.toString() !== "612198502f4d5273b466b4e4" ||
+    res.locals.user._id.toString() !== "612198502f4d5273b466b4e4" &&
     res.locals.user._id.toString() !== "613d0935341e9f055c320d81"
   ) {
     return res.status(403).send({ error: "Restricted" });
   }
 
   try {
-    // Ensure the IDs are converted to ObjectId if they are not already
-    const objectIdList = trainingIdList.map((id) => mongoose.Types.ObjectId(id));
+    const objectIdList = trainingIdList.map((id) => new mongoose.Types.ObjectId(id));
 
-    // Fetch only the documents that match the IDs in trainingIdList
     const data = await Training.find({ _id: { $in: objectIdList } });
 
     const changelog = [];
@@ -520,13 +453,12 @@ const update_master_exercise_name = async (req, res, next) => {
         set.forEach((exercise) => {
           if (exercise.exercise === incorrectExercise) {
             changelog.push(`${day.date} | ${exercise.exercise}`);
-            exercise.exercise = correctExercise; // Update the exercise name
+            exercise.exercise = correctExercise;
           }
         });
       });
     });
 
-    // Save the modified documents back to the database
     const savePromises = data.map((day) => day.save());
     await Promise.all(savePromises);
 
@@ -566,7 +498,6 @@ const update_exercise_name = async (req, res, next) => {
       });
     });
 
-    // Save the modified documents back to the database
     const savePromises = data.map((day) => day.save());
     await Promise.all(savePromises);
 
@@ -588,36 +519,37 @@ const update_exercise_name = async (req, res, next) => {
 };
 
 const checkClientRelationship = (trainerId, clientId) => {
-  return new Promise((resolve, reject) => {
-    Relationship.findOne({ trainer: trainerId, client: clientId }, (err, relationship) => {
-      if (err) {
-        reject(err);
-      } else if (!relationship) {
-        resolve({ error: "Relationship does not exist." });
+  return Relationship.findOne({ trainer: trainerId, client: clientId })
+    .then((relationship) => {
+      if (!relationship) {
+        return { error: "Relationship does not exist." };
       } else if (relationship.accepted) {
-        resolve({ accepted: true, relationship });
+        return { accepted: true, relationship };
       } else {
-        resolve({ error: "Relationship pending." });
+        return { error: "Relationship pending." };
       }
+    })
+    .catch((err) => {
+      throw err;
     });
-  });
 };
+
 
 module.exports = {
   create_training,
+  update_training,
   get_training_by_id,
   get_workout_queue,
   get_workouts_by_date,
-  update_training,
   get_weekly_training,
   get_list_every_exercise,
   get_exercise_list,
   get_exercise_history,
   copy_workout_by_id,
-  update_workout_date_by_id,
   delete_workout_by_id,
   workout_history_request,
   workout_month_request,
   update_master_exercise_name,
   update_exercise_name,
+  update_workout_date_by_id
 };
