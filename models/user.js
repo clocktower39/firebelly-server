@@ -18,6 +18,12 @@ const UserSchema = new mongoose.Schema({
         ref: "profilePictures.files"
     },
     themeMode: { type: String, required: true, default: 'light', },
+    verified: {
+        isVerified: { type: Boolean, default: false },
+        verificationToken: { type: String, default: null },
+        verificationTokenExpires: { type: Date, default: null },
+      },
+      
 }, { minimize: false })
 
 UserSchema.pre('save', function(next) {

@@ -31,9 +31,11 @@ const signupValidate = {
 }
 
 router.get('/checkAuthToken', verifyAccessToken, userController.checkAuthLoginToken);
-router.get('/trainers', verifyAccessToken, userController.get_trainers);
 router.post('/login', validate(loginValidate, {}, {}), userController.login_user);
 router.post('/signup', validate(signupValidate, {}, {}), userController.signup_user);
+router.get('/verify-email', userController.verify_email);
+router.post('/resend-verification-email', userController.resend_verification_email);
+router.get('/trainers', verifyAccessToken, userController.get_trainers);
 router.post('/updateUser', verifyAccessToken, userController.update_user);
 router.post('/getUser', verifyAccessToken, userController.get_userInfo);
 router.post('/changePassword', verifyAccessToken, userController.change_password);
