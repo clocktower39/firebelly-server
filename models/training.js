@@ -11,7 +11,7 @@ const trainingSchema = new mongoose.Schema(
       type: [
         [
           {
-            exercise: { type: String },
+            exercise: { type: mongoose.Schema.Types.ObjectId, ref: "Exercise", required: true },
             exerciseType: { type: String },
             goals: {
               sets: { type: Number },

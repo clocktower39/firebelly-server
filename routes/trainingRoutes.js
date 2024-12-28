@@ -1,24 +1,14 @@
 const express = require('express');
 const trainingController = require('../controllers/trainingController');
 const { verifyAccessToken, verifyRefreshToken } = require("../middleware/auth");
-const { validate, Joi } = require('express-validation');
 const router = express.Router();
-
-const exerciseHistoryValidate = {
-    body: Joi.object({
-        targetExercise: Joi.string()
-            .required(),
-        user: Joi.object()
-            .required(),
-    }),
-}
 
 router.post('/training', verifyAccessToken, trainingController.get_training_by_id);
 router.post('/workouts', verifyAccessToken, trainingController.get_workouts_by_date);
 router.post('/updateTraining', verifyAccessToken, trainingController.update_training);
 router.post('/createTraining', verifyAccessToken, trainingController.create_training);
 router.post('/trainingWeek', verifyAccessToken, trainingController.get_weekly_training);
-router.post('/exerciseHistory', verifyAccessToken, validate(exerciseHistoryValidate, {}, {}), trainingController.get_exercise_history);
+router.post('/exerciseHistory', verifyAccessToken, trainingController.get_exercise_history);
 router.get('/exerciseList', verifyAccessToken, trainingController.get_list_every_exercise);
 router.post('/myExerciseList', verifyAccessToken, trainingController.get_exercise_list);
 router.post('/copyWorkoutById', verifyAccessToken, trainingController.copy_workout_by_id);

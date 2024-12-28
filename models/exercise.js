@@ -8,7 +8,7 @@ const exerciseSchema = new mongoose.Schema(
       secondary: { type: Array, required: true, default: [], },
     },
     equipment: { type: Array, required: true, default: [], },
-    instructions: { type: String, required: false, default: '', },
+    description: { type: String, required: false, default: '', },
     tags: { type: Array, required: true, default: [], },
 
     generalVariation: { type: Array },
