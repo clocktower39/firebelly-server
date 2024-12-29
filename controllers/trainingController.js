@@ -407,6 +407,11 @@ const copy_workout_by_id = (req, res, next) => {
         });
         break;
     }
+    data.training.forEach((set) => {
+      set.forEach((exercise) => {
+        exercise.exercise = exercise.exercise;
+      });
+    });
 
     data._id = new mongoose.Types.ObjectId();
     data.isNew = true;
