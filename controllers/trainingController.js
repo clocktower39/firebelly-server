@@ -324,6 +324,13 @@ const update_workout_date_by_id = async (req, res, next) => {
   const updateWorkoutDate = async (training, newDate) => {
     try {
       training.date = newDate;
+      
+      training.training.forEach((set) => {
+        set.forEach((exercise) => {
+          exercise.exercise = exercise.exercise;
+        });
+      });
+
       const updatedTraining = await training.save();
       return updatedTraining;
     } catch (error) {
