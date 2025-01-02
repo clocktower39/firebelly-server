@@ -549,93 +549,6 @@ const workout_month_request = async (req, res, next) => {
   }
 };
 
-const update_master_exercise_name = async (req, res, next) => {
-  const { incorrectExercise, correctExercise, trainingIdList } = req.body;
-
-  if (
-    res.locals.user._id.toString() !== "612198502f4d5273b466b4e4" &&
-    res.locals.user._id.toString() !== "613d0935341e9f055c320d81"
-  ) {
-    return res.status(403).send({ error: "Restricted" });
-  }
-
-  try {
-    const objectIdList = trainingIdList.map((id) => new mongoose.Types.ObjectId(id));
-
-    const data = await Training.find({ _id: { $in: objectIdList } });
-
-    const changelog = [];
-
-    data.forEach((day) => {
-      day.training.forEach((set) => {
-        set.forEach((exercise) => {
-          if (exercise.exercise === incorrectExercise) {
-            changelog.push(`${day.date} | ${exercise.exercise}`);
-            exercise.exercise = correctExercise;
-          }
-        });
-      });
-    });
-
-    const savePromises = data.map((day) => day.save());
-    await Promise.all(savePromises);
-
-    res.send({
-      statusCode: 200,
-      details: {
-        body: [
-          {
-            message: "Exercises updated successfully",
-            removed: incorrectExercise,
-          },
-        ],
-      },
-    });
-  } catch (err) {
-    console.error("Error occurred:", err);
-    return next(err);
-  }
-};
-
-const update_exercise_name = async (req, res, next) => {
-  const { incorrectExercise, correctExercise } = req.body;
-
-  try {
-    const data = await Training.find({ user: res.locals.user._id });
-
-    const changelog = [];
-
-    data.forEach((day) => {
-      day.training.forEach((set) => {
-        set.forEach((exercise) => {
-          if (exercise.exercise === incorrectExercise) {
-            changelog.push(`${day.date} | ${exercise.exercise}`);
-            exercise.exercise = correctExercise;
-          }
-        });
-      });
-    });
-
-    const savePromises = data.map((day) => day.save());
-    await Promise.all(savePromises);
-
-    res.send({
-      statusCode: 200,
-      details: {
-        body: [
-          {
-            message: "Exercises updated successfully",
-            removed: incorrectExercise,
-          },
-        ],
-      },
-    });
-  } catch (err) {
-    console.error("Error occurred:", err);
-    return next(err);
-  }
-};
-
 const checkClientRelationship = (trainerId, clientId) => {
   return Relationship.findOne({ trainer: trainerId, client: clientId })
     .then((relationship) => {
@@ -666,7 +579,5 @@ module.exports = {
   delete_workout_by_id,
   workout_history_request,
   workout_month_request,
-  update_master_exercise_name,
-  update_exercise_name,
   update_workout_date_by_id,
 };
