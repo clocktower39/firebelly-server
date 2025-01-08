@@ -12,7 +12,7 @@ const exerciseSchema = new mongoose.Schema(
     tags: { type: Array, required: true, default: [], },
 
     generalVariation: { type: Array },
-    tempo: { type: Array },
+    attachments: { type: Array },
     anatomicalHandPosition: { type: Array },
     footSetup: { type: Array },
     handSetup: { type: Array },
