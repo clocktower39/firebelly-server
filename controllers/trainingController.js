@@ -321,9 +321,10 @@ const get_exercise_history = (req, res, next) => {
 };
 
 const update_workout_date_by_id = async (req, res, next) => {
-  const updateWorkoutDate = async (training, newDate) => {
+  const updateWorkoutDate = async (training, newDate, newTitle) => {
     try {
       training.date = newDate;
+      training.title = newTitle;
       
       training.training.forEach((set) => {
         set.forEach((exercise) => {
@@ -348,7 +349,7 @@ const update_workout_date_by_id = async (req, res, next) => {
     // Check if the user updating the data is the owner
     if (training.user._id.toString() === res.locals.user._id) {
       // Update the workout date
-      const updatedTraining = await updateWorkoutDate(training, req.body.newDate);
+      const updatedTraining = await updateWorkoutDate(training, req.body.newDate, req.body.newTitle);
       return res.send(updatedTraining);
     }
 
