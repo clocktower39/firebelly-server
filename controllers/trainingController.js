@@ -537,6 +537,10 @@ const workout_month_request = async (req, res, next) => {
       path: "training.exercise",
       model: "Exercise",
       select: "_id exerciseTitle",
+    }).populate({
+      path: "user",
+      model: "User",
+      select: "_id firstName lastName profilePicture",
     });
 
     if (user === trainer || (isClientRequest && (await checkClientRelationship(trainer, user)))) {
