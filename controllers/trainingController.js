@@ -358,7 +358,7 @@ const update_workout_date_by_id = async (req, res, next) => {
 
     if (relationship && relationship.accepted) {
       // If the relationship is accepted, update the workout date
-      const updatedTraining = await updateWorkoutDate(training, req.body.newDate);
+      const updatedTraining = await updateWorkoutDate(training, req.body.newDate, req.body.newTitle);
       res.send(updatedTraining);
     } else {
       res.status(403).json({ error: "Unauthorized access." });
