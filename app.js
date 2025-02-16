@@ -68,6 +68,34 @@ global.io.on("connection", (socket) => {
 
   console.log(`${userId} connected with IP: ${socket.conn.remoteAddress}`);
 
+  // Listen for a trainer or client joining a workout room
+  socket.on("joinWorkout", ({ workoutId }) => {
+    if (workoutId) {
+      socket.join(workoutId);
+      console.log(`Socket ${socket.id} joined workout room ${workoutId}`);
+
+      // Optionally, notify other users in the room that someone joined
+      socket.to(workoutId).emit("userJoined", { socketId: socket.id });
+    }
+  });
+
+  // Listen for a trainer or client leaving a workout room
+  socket.on("leaveWorkout", ({ workoutId }) => {
+    if (workoutId) {
+      socket.leave(workoutId);
+      console.log(`Socket ${socket.id} left workout room ${workoutId}`);
+
+      // Optionally, notify others in the room that someone left
+      socket.to(workoutId).emit("userLeft", { socketId: socket.id });
+    }
+  });
+
+  socket.on("liveTrainingUpdate", ({ workoutId, updatedTraining }) => {
+    // Broadcast the update to all other clients in the room
+    console.log(new Date())
+    socket.to(workoutId).emit("liveTrainingUpdate", updatedTraining);
+  });
+
   // Listen for the 'requestClientStatuses' event and send the current status
   socket.on("requestClientStatuses", () => {
     const clientStatuses = Object.keys(connectedClients).reduce((statuses, id) => {
