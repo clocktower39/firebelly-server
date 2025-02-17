@@ -70,29 +70,33 @@ global.io.on("connection", (socket) => {
 
   // Listen for a trainer or client joining a workout room
   socket.on("joinWorkout", ({ workoutId }) => {
-    if (workoutId) {
-      socket.join(workoutId);
-      console.log(`Socket ${socket.id} joined workout room ${workoutId}`);
-
-      // Optionally, notify other users in the room that someone joined
-      socket.to(workoutId).emit("userJoined", { socketId: socket.id });
-    }
+    socket.join(workoutId);
+    console.log(`Socket ${socket.id} joined workout room ${workoutId}`);
+    // Notify other clients in the room that a new user joined.
+    socket.to(workoutId).emit("userJoined", { newUser: socket.id, workoutId });
   });
 
-  // Listen for a trainer or client leaving a workout room
   socket.on("leaveWorkout", ({ workoutId }) => {
-    if (workoutId) {
-      socket.leave(workoutId);
-      console.log(`Socket ${socket.id} left workout room ${workoutId}`);
-
-      // Optionally, notify others in the room that someone left
-      socket.to(workoutId).emit("userLeft", { socketId: socket.id });
-    }
+    socket.leave(workoutId);
+    console.log(`Socket ${socket.id} left workout room ${workoutId}`);
   });
 
+  // When a client requests the current state, broadcast the request to all others in the room
+  socket.on("requestCurrentState", ({ workoutId }) => {
+    // Broadcast to everyone else in the room so that one of them can reply.
+    socket.to(workoutId).emit("requestCurrentState", {
+      requester: socket.id,
+      workoutId,
+    });
+  });
+
+  // When a client sends its current state, relay it directly to the requester.
+  socket.on("currentState", ({ workoutId, currentState, requester }) => {
+    global.io.to(requester).emit("currentState", { workoutId, currentState });
+  });
+
+  // Relay live updates to everyone except the sender.
   socket.on("liveTrainingUpdate", ({ workoutId, updatedTraining }) => {
-    // Broadcast the update to all other clients in the room
-    console.log(new Date())
     socket.to(workoutId).emit("liveTrainingUpdate", updatedTraining);
   });
 
