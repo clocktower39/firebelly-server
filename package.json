@@ -5,22 +5,22 @@
   "license": "MIT",
   "dependencies": {
     "bcrypt": "^5.1.1",
-    "body-parser": "^1.20.3",
+    "body-parser": "^2.2.0",
     "cors": "^2.8.5",
     "dayjs": "^1.11.13",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
     "express-validation": "^4.1.1",
     "jsonwebtoken": "^9.0.2",
     "method-override": "^3.0.0",
-    "mongoose": "^8.9.5",
+    "mongoose": "^8.13.2",
     "mongoose-paginate-v2": "^1.9.0",
-    "multer": "^1.4.5-lts.1",
-    "nodemailer": "^6.10.0",
+    "multer": "^1.4.5-lts.2",
+    "nodemailer": "^6.10.1",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.10"
   },
   "scripts": {
     "start": "node app.js",
