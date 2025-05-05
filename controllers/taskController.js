@@ -1,37 +1,43 @@
 const Task = require("../models/task");
 
 const get_tasks = (req, res, next) => {
-  Task.find({ user: res.locals.user._id }, function (err, data) {
-    if (err) return next(err);
-    res.send(data);
-  });
+  Task.find({ user: res.locals.user._id })
+    .then((data) => {
+      res.send(data);
+    })
+    .catch((err) => next(err));
 };
 
 const update_task_history = (req, res, next) => {
   const query = { user: res.locals.user._id };
 
-  // Find the document
-  Task.findOne(query, function (err, result) {
-    if (err) return next(err);
+  Task.findOne(query)
+    .then((result) => {
+      result.history = req.body.history;
 
-    result.history = req.body.history;
-    result.save((err, result) => {
-      if (err) return next(err);
-      res.send(result)
-    });
-  });
+      result
+        .save()
+        .then((result) => {
+          res.send(result);
+        })
+        .catch((err) => next(err));
+    })
+    .catch((err) => next(err));
 };
 
 const update_default_tasks = (req, res, next) => {
-  Task.findOne({ user: res.locals.user._id }, function (err, data) {
-    if (err) return next(err);
+  Task.findOne({ user: res.locals.user._id })
+    .then((data) => {
+      data.defaultTasks = req.body.defaultTasks;
 
-    data.defaultTasks = req.body.defaultTasks;
-    data.save((err) => {
-      if (err) return next(err);
-      res.send({ status: "Successful" });
-    });
-  });
+      data
+        .save()
+        .then((data) => {
+          res.send({ status: "Successful" });
+        })
+        .catch((err) => next(err));
+    })
+    .catch((err) => next(err));
 };
 
 module.exports = {

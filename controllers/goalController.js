@@ -67,28 +67,29 @@ const comment_on_goal = (req, res, next) => {
 
 const get_goals = (req, res, next) => {
   Goal.find({ user: res.locals.user._id })
-  .then(data => {
-    res.send(data || { results: "No Results" });
-  })
-  .catch(err => next(err));
+    .then((data) => {
+      res.send(data || { results: "No Results" });
+    })
+    .catch((err) => next(err));
 };
 
 const get_client_goals = (req, res, next) => {
   const { client } = req.body;
   Relationship.findOne({ trainer: res.locals.user._id, client })
-  .then(relationship => {
-    if (!relationship) {
-      res.send({ error: "Relationship does not exist." });
-    } else if (relationship.accepted) {
-      Goal.find({ user: client }, function (err, data) {
-        if (err) return next(err);
-        res.send(data);
-      });
-    } else {
-      res.send({ error: "Relationship pending." });
-    }
-  })
-  .catch(err => next(err));
+    .then((relationship) => {
+      if (!relationship) {
+        res.send({ error: "Relationship does not exist." });
+      } else if (relationship.accepted) {
+        Goal.find({ user: client })
+          .then((data) => {
+            res.send(data);
+          })
+          .catch((err) => next(err));
+      } else {
+        res.send({ error: "Relationship pending." });
+      }
+    })
+    .catch((err) => next(err));
 };
 
 module.exports = {

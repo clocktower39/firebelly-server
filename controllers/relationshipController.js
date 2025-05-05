@@ -58,13 +58,11 @@ const get_relationships = (req, res, next) => {
       })
       .catch((err) => next(err));
   } else if (req.params.type === "client") {
-    Relationship.find(
-      { client: req.params._id, trainer: res.locals.user._id },
-      function (err, data) {
-        if (err) return next(err);
+    Relationship.find({ client: req.params._id, trainer: res.locals.user._id })
+      .then((data) => {
         res.send(data);
-      }
-    );
+      })
+      .catch((err) => next(err));
   } else {
     res.send("Invalid request");
   }
