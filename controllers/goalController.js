@@ -54,6 +54,7 @@ const comment_on_goal = (req, res, next) => {
       const newComment = {
         createdDate: new Date(),
         comment,
+        user: res.locals.user._id,
       };
       goal.comments ? goal.comments.push(newComment) : (goal.comments = [newComment]);
 
@@ -67,6 +68,7 @@ const comment_on_goal = (req, res, next) => {
 
 const get_goals = (req, res, next) => {
   Goal.find({ user: res.locals.user._id })
+    .populate("comments.user", "firstName lastName profilePicture")
     .then((data) => {
       res.send(data || { results: "No Results" });
     })
@@ -81,6 +83,7 @@ const get_client_goals = (req, res, next) => {
         res.send({ error: "Relationship does not exist." });
       } else if (relationship.accepted) {
         Goal.find({ user: client })
+          .populate("comments.user", "firstName lastName profilePicture")
           .then((data) => {
             res.send(data);
           })
