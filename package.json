@@ -4,7 +4,7 @@
   "main": "app.js",
   "license": "MIT",
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
     "dayjs": "^1.11.13",
@@ -13,10 +13,10 @@
     "express-validation": "^4.1.1",
     "jsonwebtoken": "^9.0.2",
     "method-override": "^3.0.0",
-    "mongoose": "^8.13.2",
+    "mongoose": "^8.15.0",
     "mongoose-paginate-v2": "^1.9.0",
     "multer": "^1.4.5-lts.2",
-    "nodemailer": "^6.10.1",
+    "nodemailer": "^7.0.3",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
