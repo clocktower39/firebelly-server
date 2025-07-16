@@ -124,7 +124,6 @@ const get_list_every_exercise = (req, res, next) => {
   //   })
   //   .then((data) => {
   //     let exerciseCounts = {};
-
   //     data.forEach((day) => {
   //       day.training.forEach((set) => {
   //         set.forEach((exercise) => {
@@ -138,14 +137,12 @@ const get_list_every_exercise = (req, res, next) => {
   //                 users: [],
   //               };
   //             }
-
   //             exerciseCounts[exerciseName].count++;
   //             exerciseCounts[exerciseName].dates.push({
   //               date: day.date,
   //               user: day.user,
   //               trainingId: day._id,
   //             });
-
   //             const userId = day.user?._id.toString();
   //             if (!exerciseCounts[exerciseName].uniqueUsers.has(userId)) {
   //               exerciseCounts[exerciseName].uniqueUsers.add(userId);
@@ -155,7 +152,6 @@ const get_list_every_exercise = (req, res, next) => {
   //         });
   //       });
   //     });
-
   //     let exerciseList = Object.keys(exerciseCounts)
   //       .map((key) => {
   //         const exercise = exerciseCounts[key];
@@ -167,13 +163,10 @@ const get_list_every_exercise = (req, res, next) => {
   //         };
   //       })
   //       .sort((a, b) => b.count - a.count);
-
   // --- this works for creating the exercise library ---
-
   // const exerciseTitleList = exerciseList.map(ex => ex.exercise);
   // exerciseTitleList.forEach(exerciseTitle => {
   //   // create exercise library entry
-
   //     let exercise = new Exercise({
   //       exerciseTitle,
   //     });
@@ -183,9 +176,7 @@ const get_list_every_exercise = (req, res, next) => {
   //       .catch((err) => next(err));
   //     };
   //     saveExercise();
-
   // })
-
   // Exercise.find({})
   //   .then((exercises) => {
   //     // Convert array of exercises into a lookup map for quick retrieval by exerciseTitle
@@ -193,19 +184,15 @@ const get_list_every_exercise = (req, res, next) => {
   //     exercises.forEach((ex) => {
   //       exerciseMap[ex.exerciseTitle] = ex._id;
   //     });
-
   //     console.log("Exercise map keys:", Object.keys(exerciseMap));
-
   //     Training.find({})
   //       .then(async (trainings) => {
   //         for (const workout of trainings) {
   //           let modified = false;
-
   //           // Assuming workout.training is an array of circuits, and each circuit is an array of exercises
   //           for (const circuit of workout.training) {
   //             for (const exercise of circuit) {
   //               console.log(exercise.exercise);
-
   //               const exerciseName = exercise.exercise;
   //               if (exerciseMap[exerciseName]) {
   //                 exercise.exercise = new mongoose.Types.ObjectId(exerciseMap[exerciseName]);
@@ -216,7 +203,6 @@ const get_list_every_exercise = (req, res, next) => {
   //               }
   //             }
   //           }
-
   //           if (modified) {
   //             await workout.save();
   //           }
@@ -231,14 +217,13 @@ const get_list_every_exercise = (req, res, next) => {
   //     console.error(err);
   //     next(err);
   //   });
-
   // res.send(
-    // exerciseList.map((ex) => ({
-    //   exercise: ex.exercise,
-    //   count: ex.count,
-    //   dates: ex.dates,
-    //   users: ex.users,
-    // }))
+  // exerciseList.map((ex) => ({
+  //   exercise: ex.exercise,
+  //   count: ex.count,
+  //   dates: ex.dates,
+  //   users: ex.users,
+  // }))
   // );
   // })
   // .catch((err) => next(err));
@@ -278,16 +263,16 @@ const get_exercise_list = (req, res, next) => {
 
 const get_exercise_history = (req, res, next) => {
   const { targetExercise, user } = req.body;
-  const targetExerciseId = new mongoose.Types.ObjectId(targetExercise._id)
-  
-  Training.find({ 
+  const targetExerciseId = new mongoose.Types.ObjectId(targetExercise._id);
+
+  Training.find({
     user: user._id,
     training: {
       $elemMatch: {
-        $elemMatch: { exercise: targetExerciseId }
-      }
+        $elemMatch: { exercise: targetExerciseId },
+      },
     },
-   })
+  })
     .populate({
       path: "training.exercise",
       select: "_id exerciseTitle",
@@ -301,12 +286,9 @@ const get_exercise_history = (req, res, next) => {
       if (res.locals.user._id === user._id || relationship?.accepted) {
         data.map((day) => {
           day.training.map((set) => {
-            let targetedExercise = set.filter(
-              (exercise) =>
-              {
-                return exercise.exercise._id.equals(targetExerciseId)
-              }
-            );
+            let targetedExercise = set.filter((exercise) => {
+              return exercise.exercise._id.equals(targetExerciseId);
+            });
             if (targetedExercise.length > 0) {
               historyList.push({ ...targetedExercise[0], date: day.date });
             }
@@ -325,7 +307,7 @@ const update_workout_date_by_id = async (req, res, next) => {
     try {
       training.date = newDate;
       training.title = newTitle;
-      
+
       training.training.forEach((set) => {
         set.forEach((exercise) => {
           exercise.exercise = exercise.exercise;
@@ -349,7 +331,11 @@ const update_workout_date_by_id = async (req, res, next) => {
     // Check if the user updating the data is the owner
     if (training.user._id.toString() === res.locals.user._id) {
       // Update the workout date
-      const updatedTraining = await updateWorkoutDate(training, req.body.newDate, req.body.newTitle);
+      const updatedTraining = await updateWorkoutDate(
+        training,
+        req.body.newDate,
+        req.body.newTitle
+      );
       return res.send(updatedTraining);
     }
 
@@ -358,7 +344,11 @@ const update_workout_date_by_id = async (req, res, next) => {
 
     if (relationship && relationship.accepted) {
       // If the relationship is accepted, update the workout date
-      const updatedTraining = await updateWorkoutDate(training, req.body.newDate, req.body.newTitle);
+      const updatedTraining = await updateWorkoutDate(
+        training,
+        req.body.newDate,
+        req.body.newTitle
+      );
       res.send(updatedTraining);
     } else {
       res.status(403).json({ error: "Unauthorized access." });
@@ -426,15 +416,23 @@ const copy_workout_by_id = (req, res, next) => {
     data.date = newDate;
     data
       .save()
-      .then(() => {
-        res.send({
-          status: "Copy Successful",
-        });
+      .then((workoutCopy) => {
+        res.send(workoutCopy);
       })
       .catch((err) => next(err));
   };
 
   Training.findOne({ _id })
+    .populate({
+      path: "training.exercise",
+      model: "Exercise",
+      select: "_id exerciseTitle",
+    })
+    .populate({
+      path: "user",
+      model: "User",
+      select: "_id firstName lastName profilePicture",
+    })
     .then((data) => {
       if (!data) return res.status(404).json({ error: "Training not found." });
 
@@ -533,15 +531,17 @@ const workout_month_request = async (req, res, next) => {
         $gte: startDate.toDate(),
         $lte: endDate.toDate(),
       },
-    }).populate({
-      path: "training.exercise",
-      model: "Exercise",
-      select: "_id exerciseTitle",
-    }).populate({
-      path: "user",
-      model: "User",
-      select: "_id firstName lastName profilePicture",
-    });
+    })
+      .populate({
+        path: "training.exercise",
+        model: "Exercise",
+        select: "_id exerciseTitle",
+      })
+      .populate({
+        path: "user",
+        model: "User",
+        select: "_id firstName lastName profilePicture",
+      });
 
     if (user === trainer || (isClientRequest && (await checkClientRelationship(trainer, user)))) {
       res.json(data);
