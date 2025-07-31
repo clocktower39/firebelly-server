@@ -107,6 +107,11 @@ const get_weekly_training = (req, res, next) => {
     user: res.locals.user._id,
   })
     .populate({
+      path: "user",
+      model: "User",
+      select: "_id firstName lastName profilePicture",
+    })
+    .populate({
       path: "training.exercise",
       model: "Exercise",
       select: "_id exerciseTitle",
