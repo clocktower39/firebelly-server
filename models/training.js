@@ -39,6 +39,20 @@ const trainingSchema = new mongoose.Schema(
                 },
               ],
             },
+            feedback: {
+              difficulty: { type: Number },
+              comments: {
+                type: [
+                  {
+                    timestamp: { type: Date, default: Date.now },
+                    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, },
+                    text: { type: String, required: true, },
+                    deletedAt: { type: Date, default: null },
+                    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+                  }
+                ],
+              }
+            },
           },
         ],
       ],
