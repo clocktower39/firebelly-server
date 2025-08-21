@@ -31,11 +31,6 @@ const update_training = (req, res, next) => {
 const get_training_by_id = (req, res, next) => {
   Training.findOne({ _id: req.body._id })
     .populate({
-      path: "training.notes.user",
-      model: "User",
-      select: "_id firstName lastName profilePicture",
-    })
-    .populate({
       path: "user",
       model: "User",
       select: "_id firstName lastName profilePicture",
@@ -44,6 +39,16 @@ const get_training_by_id = (req, res, next) => {
       path: "training.exercise",
       model: "Exercise",
       select: "_id exerciseTitle",
+    })
+    .populate({
+      path: "training.feedback.comments.user",
+      model: "User",
+      select: "_id firstName lastName profilePicture",
+    })
+    .populate({
+      path: "training.notes.user",
+      model: "User",
+      select: "_id firstName lastName profilePicture",
     })
     .then((data) => {
       if (!data) {
