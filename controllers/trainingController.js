@@ -125,120 +125,6 @@ const get_weekly_training = (req, res, next) => {
     .catch((err) => next(err));
 };
 
-const get_list_every_exercise = (req, res, next) => {
-  // Training.find({})
-  //   .populate({
-  //     path: "user",
-  //     model: "User",
-  //     select: "_id firstName lastName profilePicture",
-  //   })
-  //   .then((data) => {
-  //     let exerciseCounts = {};
-  //     data.forEach((day) => {
-  //       day.training.forEach((set) => {
-  //         set.forEach((exercise) => {
-  //           if (exercise.exercise) {
-  //             let exerciseName = exercise.exercise;
-  //             if (!exerciseCounts[exerciseName]) {
-  //               exerciseCounts[exerciseName] = {
-  //                 count: 0,
-  //                 dates: [],
-  //                 uniqueUsers: new Set(),
-  //                 users: [],
-  //               };
-  //             }
-  //             exerciseCounts[exerciseName].count++;
-  //             exerciseCounts[exerciseName].dates.push({
-  //               date: day.date,
-  //               user: day.user,
-  //               trainingId: day._id,
-  //             });
-  //             const userId = day.user?._id.toString();
-  //             if (!exerciseCounts[exerciseName].uniqueUsers.has(userId)) {
-  //               exerciseCounts[exerciseName].uniqueUsers.add(userId);
-  //               exerciseCounts[exerciseName].users.push(day.user);
-  //             }
-  //           }
-  //         });
-  //       });
-  //     });
-  //     let exerciseList = Object.keys(exerciseCounts)
-  //       .map((key) => {
-  //         const exercise = exerciseCounts[key];
-  //         return {
-  //           exercise: key,
-  //           count: exercise.count,
-  //           dates: exercise.dates,
-  //           users: exercise.users,
-  //         };
-  //       })
-  //       .sort((a, b) => b.count - a.count);
-  // --- this works for creating the exercise library ---
-  // const exerciseTitleList = exerciseList.map(ex => ex.exercise);
-  // exerciseTitleList.forEach(exerciseTitle => {
-  //   // create exercise library entry
-  //     let exercise = new Exercise({
-  //       exerciseTitle,
-  //     });
-  //     let saveExercise = () => {
-  //       exercise.save()
-  //       .then(()=> console.log(`created ${exerciseTitle}`))
-  //       .catch((err) => next(err));
-  //     };
-  //     saveExercise();
-  // })
-  // Exercise.find({})
-  //   .then((exercises) => {
-  //     // Convert array of exercises into a lookup map for quick retrieval by exerciseTitle
-  //     const exerciseMap = {};
-  //     exercises.forEach((ex) => {
-  //       exerciseMap[ex.exerciseTitle] = ex._id;
-  //     });
-  //     console.log("Exercise map keys:", Object.keys(exerciseMap));
-  //     Training.find({})
-  //       .then(async (trainings) => {
-  //         for (const workout of trainings) {
-  //           let modified = false;
-  //           // Assuming workout.training is an array of circuits, and each circuit is an array of exercises
-  //           for (const circuit of workout.training) {
-  //             for (const exercise of circuit) {
-  //               console.log(exercise.exercise);
-  //               const exerciseName = exercise.exercise;
-  //               if (exerciseMap[exerciseName]) {
-  //                 exercise.exercise = new mongoose.Types.ObjectId(exerciseMap[exerciseName]);
-  //                 modified = true;
-  //                 console.log("modified:", exercise.exercise);
-  //               } else {
-  //                 console.warn(`Not found: ${exerciseName}`);
-  //               }
-  //             }
-  //           }
-  //           if (modified) {
-  //             await workout.save();
-  //           }
-  //         }
-  //       })
-  //       .catch((err) => {
-  //         console.error(err);
-  //         next(err);
-  //       });
-  //   })
-  //   .catch((err) => {
-  //     console.error(err);
-  //     next(err);
-  //   });
-  // res.send(
-  // exerciseList.map((ex) => ({
-  //   exercise: ex.exercise,
-  //   count: ex.count,
-  //   dates: ex.dates,
-  //   users: ex.users,
-  // }))
-  // );
-  // })
-  // .catch((err) => next(err));
-};
-
 const get_exercise_list = (req, res, next) => {
   const { user } = req.body;
 
@@ -587,7 +473,6 @@ module.exports = {
   get_workout_queue,
   get_workouts_by_date,
   get_weekly_training,
-  get_list_every_exercise,
   get_exercise_list,
   get_exercise_history,
   copy_workout_by_id,
