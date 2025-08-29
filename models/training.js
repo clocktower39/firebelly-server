@@ -30,15 +30,6 @@ const trainingSchema = new mongoose.Schema(
               percent: { type: Array },
               seconds: { type: Array },
             },
-            notes: {
-              type: [
-                {
-                  timestamp: { type: Date },
-                  user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-                  text: { type: String },
-                },
-              ],
-            },
             feedback: {
               difficulty: { type: Number },
               comments: {
