@@ -45,11 +45,6 @@ const get_training_by_id = (req, res, next) => {
       model: "User",
       select: "_id firstName lastName profilePicture",
     })
-    .populate({
-      path: "training.notes.user",
-      model: "User",
-      select: "_id firstName lastName profilePicture",
-    })
     .then((data) => {
       if (!data) {
         return res.status(404).json({ error: "Training not found." });
@@ -270,7 +265,7 @@ const copy_workout_by_id = (req, res, next) => {
             exercise.goals.weight = exercise.achieved.weight;
             exercise.goals.percent = exercise.achieved.percent;
             exercise.goals.seconds = exercise.achieved.seconds;
-            exercise.notes = [];
+            exercise.feedback = { difficulty: null, comments: [] };
 
             for (const prop in exercise.achieved) {
               if (Array.isArray(exercise.achieved[prop])) {
@@ -284,7 +279,8 @@ const copy_workout_by_id = (req, res, next) => {
         data.complete = false;
         data.training.forEach((set) => {
           set.forEach((exercise) => {
-            exercise.notes = [];
+            exercise.feedback = { difficulty: null, comments: [] };
+            
             for (const prop in exercise.achieved) {
               if (Array.isArray(exercise.achieved[prop])) {
                 exercise.achieved[prop] = exercise.achieved[prop].map(() => "0");
@@ -296,7 +292,7 @@ const copy_workout_by_id = (req, res, next) => {
       case "exact":
         data.training.forEach((set) => {
           set.forEach((exercise) => {
-            exercise.notes = [];
+            exercise.feedback = { difficulty: null, comments: [] };
           });
         });
         break;
