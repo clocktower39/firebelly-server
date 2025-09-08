@@ -41,6 +41,11 @@ const get_training_by_id = (req, res, next) => {
       select: "_id exerciseTitle",
     })
     .populate({
+      path: "workoutFeedback.comments.user",
+      model: "User",
+      select: "_id firstName lastName profilePicture",
+    })
+    .populate({
       path: "training.feedback.comments.user",
       model: "User",
       select: "_id firstName lastName profilePicture",
