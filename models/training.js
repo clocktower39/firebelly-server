@@ -1,6 +1,17 @@
 const mongoose = require("mongoose");
 const mongoosePaginate = require("mongoose-paginate-v2");
 
+const commentSchema = new mongoose.Schema(
+  {
+    timestamp: { type: Date, default: Date.now },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    text: { type: String, required: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { _id: true }
+);
+
 const trainingSchema = new mongoose.Schema(
   {
     title: { type: String },
@@ -31,18 +42,8 @@ const trainingSchema = new mongoose.Schema(
               seconds: { type: Array },
             },
             feedback: {
-              difficulty: { type: Number },
-              comments: {
-                type: [
-                  {
-                    timestamp: { type: Date, default: Date.now },
-                    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, },
-                    text: { type: String, required: true, },
-                    deletedAt: { type: Date, default: null },
-                    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-                  }
-                ],
-              }
+              difficulty: { type: Number, min: 0, max: 2, default: 1 },
+              comments: { type: [commentSchema], default: [], }
             },
           },
         ],
@@ -72,6 +73,10 @@ const trainingSchema = new mongoose.Schema(
         ],
       ],
       required: true,
+    },
+    workoutFeedback: {
+      difficulty: { type: Number, min: 0, max: 2, default: 1 },
+      comments: { type: [commentSchema], default: [], }
     },
     queuePosition: {
       type: Number,
