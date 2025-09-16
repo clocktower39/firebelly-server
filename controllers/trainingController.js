@@ -275,7 +275,7 @@ const copy_workout_by_id = (req, res, next) => {
         data.training.forEach((set) => {
           set.forEach((exercise) => {
             exercise.feedback = { difficulty: null, comments: [] };
-            
+
             for (const prop in exercise.achieved) {
               if (Array.isArray(exercise.achieved[prop])) {
                 exercise.achieved[prop] = exercise.achieved[prop].map(() => "0");
@@ -298,9 +298,11 @@ const copy_workout_by_id = (req, res, next) => {
       });
     });
 
+
     data._id = new mongoose.Types.ObjectId();
     data.isNew = true;
     data.date = newDate;
+    data.workoutFeedback = { difficulty: 1, comments: [] };
     data
       .save()
       .then((workoutCopy) => {
