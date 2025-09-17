@@ -22,6 +22,16 @@ const create_training = (req, res, next) => {
 
 const update_training = (req, res, next) => {
   Training.findByIdAndUpdate(req.body._id, { ...req.body.training }, { new: true })
+    .populate({
+      path: "training.exercise",
+      model: "Exercise",
+      select: "_id exerciseTitle",
+    })
+    .populate({
+      path: "user workoutFeedback.comments.user workoutFeedback.comments.deletedBy training.feedback.comments.user training.feedback.comments.deletedBy",
+      model: "User",
+      select: "_id firstName lastName profilePicture",
+    })
     .then((training) => {
       res.send({ training });
     })
