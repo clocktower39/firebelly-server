@@ -81,22 +81,30 @@ const get_workout_queue = (req, res, next) => {
     .catch((err) => next(err));
 };
 
-const get_workouts_by_date = (req, res, next) => {
+const get_workouts_by_date = async (req, res, next) => {
   const { client } = req.body;
   const userId = res.locals.user._id;
-
-  const targetUser = client ?? userId;
+  let clientObj;
 
   if (client) {
-    Relationship.findOne({ trainer: userId, client })
+    await Relationship.findOne({ trainer: userId, client })
+      .populate({
+        path: "client",
+        model: "User",
+        select: "_id firstName lastName profilePicture",
+      })
       .then((relationship) => {
         if (!relationship || !relationship.accepted) {
           return res.status(403).json({ error: "Unauthorized access." });
         }
+        clientObj = relationship.client;
       })
       .catch((err) => next(err));
   }
-  Training.find({ user: targetUser, date: req.body.date })
+
+  const targetUserId = clientObj ?? userId;
+  
+  Training.find({ user: targetUserId, date: req.body.date })
     .populate({
       path: "training.exercise",
       model: "Exercise",
@@ -108,7 +116,7 @@ const get_workouts_by_date = (req, res, next) => {
       select: "_id firstName lastName profilePicture",
     })
     .then((data) => {
-      return res.send(data);
+      return res.send({ workouts: data, user: clientObj });
     })
     .catch((err) => next(err));
 };
