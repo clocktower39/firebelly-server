@@ -83,11 +83,11 @@ const get_workout_queue = (req, res, next) => {
 
 const get_workouts_by_date = async (req, res, next) => {
   const { client } = req.body;
-  const userId = res.locals.user._id;
+  const user = res.locals.user;
   let clientObj;
 
   if (client) {
-    await Relationship.findOne({ trainer: userId, client })
+    await Relationship.findOne({ trainer: user._id, client })
       .populate({
         path: "client",
         model: "User",
@@ -102,9 +102,9 @@ const get_workouts_by_date = async (req, res, next) => {
       .catch((err) => next(err));
   }
 
-  const targetUserId = clientObj ?? userId;
+  const targetUser = clientObj ?? user;
   
-  Training.find({ user: targetUserId, date: req.body.date })
+  Training.find({ user: targetUser, date: req.body.date })
     .populate({
       path: "training.exercise",
       model: "Exercise",
@@ -116,7 +116,7 @@ const get_workouts_by_date = async (req, res, next) => {
       select: "_id firstName lastName profilePicture",
     })
     .then((data) => {
-      return res.send({ workouts: data, user: clientObj });
+      return res.send({ workouts: data, user: targetUser });
     })
     .catch((err) => next(err));
 };
