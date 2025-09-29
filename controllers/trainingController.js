@@ -453,47 +453,53 @@ const workout_history_request = async (req, res, next) => {
 };
 
 const workout_month_request = async (req, res, next) => {
-  const isClientRequest = req.body.client !== undefined;
-
-  const user = isClientRequest ? req.body.client : res.locals.user._id;
-  const trainer = res.locals.user._id;
-
   try {
-    const clientDate = dayjs(req.body.date);
-    const clientDateUTC = clientDate.utc();
+    const { client, date } = req.body;
+    const user = res.locals.user;
 
-    const year = clientDateUTC.year();
-    const month = clientDateUTC.month() + 1;
+    const base = dayjs(date).utc();
+    const startDate = base.startOf("month").toDate();
+    const endDate   = base.startOf("month").add(1, "month").toDate();
 
-    const startDate = dayjs.utc(`${year}-${month}-01`);
-    const endDate = startDate.endOf("month");
+    let targetUser = user;
 
-    const data = await Training.find({
-      user: isClientRequest ? user : trainer,
-      date: {
-        $gte: startDate.toDate(),
-        $lte: endDate.toDate(),
-      },
+    if (client._id !== user._id) {
+      const relationship = await Relationship.findOne({
+        trainer: user._id,
+        client,
+        accepted: true,
+      }).populate({
+        path: "client",
+        model: "User",
+        select: "_id firstName lastName profilePicture",
+      });
+
+      if (!relationship) {
+        return res.status(403).json({ error: "Unauthorized access." });
+      }
+
+      targetUser = relationship.client;
+    }
+
+    const workouts = await Training.find({
+      user: targetUser._id,
+      date: { $gte: startDate, $lt: endDate },
     })
+      .populate({
+        path: "user workoutFeedback.comments.user workoutFeedback.comments.deletedBy training.feedback.comments.user training.feedback.comments.deletedBy",
+        model: "User",
+        select: "_id firstName lastName profilePicture",
+      })
       .populate({
         path: "training.exercise",
         model: "Exercise",
         select: "_id exerciseTitle",
       })
-      .populate({
-        path: "user",
-        model: "User",
-        select: "_id firstName lastName profilePicture",
-      });
+      .lean();
 
-    if (user === trainer || (isClientRequest && (await checkClientRelationship(trainer, user)))) {
-      res.json(data);
-    } else {
-      res.status(403).json({ error: "Unauthorized access." });
-    }
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Internal server error" });
+    return res.json({ workouts, user: targetUser });
+  } catch (err) {
+    return next(err);
   }
 };
 
