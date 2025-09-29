@@ -121,22 +121,44 @@ const get_workouts_by_date = async (req, res, next) => {
     .catch((err) => next(err));
 };
 
-const get_weekly_training = (req, res, next) => {
+const get_weekly_training = async (req, res, next) => {
   const selectedDate = new Date(req.body.date);
   const startDate = new Date(selectedDate);
   startDate.setDate(startDate.getDate() - 7);
   const endDate = new Date(selectedDate);
   endDate.setDate(endDate.getDate() + 1);
 
+  const { client } = req.body;
+  const user = res.locals.user;
+  let clientObj;
+
+  if (client) {
+    await Relationship.findOne({ trainer: user._id, client })
+      .populate({
+        path: "client",
+        model: "User",
+        select: "_id firstName lastName profilePicture",
+      })
+      .then((relationship) => {
+        if (!relationship || !relationship.accepted) {
+          return res.status(403).json({ error: "Unauthorized access." });
+        }
+        clientObj = relationship.client;
+      })
+      .catch((err) => next(err));
+  }
+
+  const targetUser = clientObj ?? user;
+
   Training.find({
     date: {
       $gte: startDate,
       $lt: endDate,
     },
-    user: res.locals.user._id,
+    user: targetUser._id,
   })
     .populate({
-      path: "user",
+      path: "user workoutFeedback.comments.user workoutFeedback.comments.deletedBy training.feedback.comments.user training.feedback.comments.deletedBy",
       model: "User",
       select: "_id firstName lastName profilePicture",
     })
@@ -145,7 +167,7 @@ const get_weekly_training = (req, res, next) => {
       model: "Exercise",
       select: "_id exerciseTitle",
     })
-    .then((data) => res.send(data))
+    .then((data) => res.send({ workouts: data, user: targetUser }))
     .catch((err) => next(err));
 };
 
