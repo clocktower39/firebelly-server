@@ -8,5 +8,6 @@ router.post('/createExercise', verifyAccessToken, exerciseController.create_exer
 router.get('/exerciseLibrary', verifyAccessToken, exerciseController.get_exercise_library);
 router.post('/search_exercise', verifyAccessToken, exerciseController.search_exercise);
 router.post('/updateExercise', verifyAccessToken, exerciseController.update_exercise);
+router.post('/mergeExercises', verifyAccessToken, exerciseController.merge_exercises);
 
 module.exports = router;

@@ -1,19 +1,28 @@
+const mongoose = require("mongoose");
 const Exercise = require("../models/exercise");
+const Training = require("../models/training");
 
-const create_exercise = (req, res, next) => {
+const exerciseAdminIds = ["612198502f4d5273b466b4e4", "613d0935341e9f055c320d81"];
+
+const isExerciseAdmin = (user) => exerciseAdminIds.includes(user?._id?.toString());
+
+const create_exercise = async (req, res, next) => {
+  if (!isExerciseAdmin(res.locals.user)) {
+    return res.status(403).send({ error: "Restricted" });
+  }
+
   let exercise = new Exercise({
     ...req.body,
   });
-  let saveExercise = () => {
-    exercise.save((err) => {
-      if (err) return next(err);
-      res.send({
-        status: "success",
-        exercise,
-      });
+  try {
+    await exercise.save();
+    return res.send({
+      status: "success",
+      exercise,
     });
-  };
-  saveExercise();
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const get_exercise_library = (req, res, next) => {
@@ -36,10 +45,7 @@ const search_exercise = (req, res, next) => {
 const update_exercise = (req, res, next) => {
   const { exercise } = req.body;
 
-  if (
-    res.locals.user._id.toString() !== "612198502f4d5273b466b4e4" &&
-    res.locals.user._id.toString() !== "613d0935341e9f055c320d81"
-  ) {
+  if (!isExerciseAdmin(res.locals.user)) {
     return res.status(403).send({ error: "Restricted" });
   }
 
@@ -51,9 +57,67 @@ const update_exercise = (req, res, next) => {
     .catch((err) => next(err));
 };
 
+const merge_exercises = async (req, res, next) => {
+  const { sourceExerciseId, targetExerciseId, deleteSource = true } = req.body;
+
+  if (!isExerciseAdmin(res.locals.user)) {
+    return res.status(403).send({ error: "Restricted" });
+  }
+
+  if (!sourceExerciseId || !targetExerciseId) {
+    return res.status(400).send({ error: "Missing exercise ids." });
+  }
+
+  if (sourceExerciseId === targetExerciseId) {
+    return res.status(400).send({ error: "Source and target cannot match." });
+  }
+
+  try {
+    const [sourceExercise, targetExercise] = await Promise.all([
+      Exercise.findById(sourceExerciseId),
+      Exercise.findById(targetExerciseId),
+    ]);
+
+    if (!sourceExercise || !targetExercise) {
+      return res.status(404).send({ error: "Exercise not found." });
+    }
+
+    const sourceObjectId = new mongoose.Types.ObjectId(`${sourceExerciseId}`);
+    const targetObjectId = new mongoose.Types.ObjectId(`${targetExerciseId}`);
+
+    const trainingUpdate = await Training.updateMany(
+      {
+        training: { $elemMatch: { $elemMatch: { exercise: sourceObjectId } } },
+      },
+      {
+        $set: {
+          "training.$[].$[entry].exercise": targetObjectId,
+        },
+      },
+      {
+        arrayFilters: [{ "entry.exercise": sourceObjectId }],
+      }
+    );
+
+    if (deleteSource) {
+      await Exercise.deleteOne({ _id: sourceExercise._id });
+    }
+
+    return res.send({
+      status: "success",
+      mergedExercise: targetExercise,
+      removedExerciseId: deleteSource ? sourceExerciseId : null,
+      updatedTrainingCount: trainingUpdate.modifiedCount ?? trainingUpdate.nModified ?? 0,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   create_exercise,
   get_exercise_library,
   search_exercise,
   update_exercise,
+  merge_exercises,
 };
