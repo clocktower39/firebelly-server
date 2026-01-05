@@ -1,23 +1,41 @@
 const Training = require("../models/training");
+const ScheduleEvent = require("../models/scheduleEvent");
 const Relationship = require("../models/relationship");
 const mongoose = require("mongoose");
 const dayjs = require("dayjs");
 const Exercise = require("../models/exercise");
 
-const create_training = (req, res, next) => {
-  let training = new Training({
-    ...req.body,
-    user: res.locals.user._id,
-  });
-  training
-    .save()
-    .then((training) => {
-      res.send({
-        status: "success",
-        training,
+const create_training = async (req, res, next) => {
+  try {
+    const { userId, ...payload } = req.body;
+    let targetUserId = res.locals.user._id;
+
+    if (userId && String(userId) !== String(res.locals.user._id)) {
+      const relationship = await Relationship.findOne({
+        trainer: res.locals.user._id,
+        client: userId,
+        accepted: true,
       });
-    })
-    .catch((err) => next(err));
+
+      if (!relationship) {
+        return res.status(403).json({ error: "Unauthorized access." });
+      }
+      targetUserId = userId;
+    }
+
+    const training = new Training({
+      ...payload,
+      user: targetUserId,
+    });
+
+    const saved = await training.save();
+    return res.send({
+      status: "success",
+      training: saved,
+    });
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const update_training = (req, res, next) => {
@@ -71,14 +89,55 @@ const get_training_by_id = (req, res, next) => {
     .catch((err) => next(err));
 };
 
-const get_workout_queue = (req, res, next) => {
-  Training.find({ user: res.locals.user._id, $or: [{ date: null }, { date: { $exists: false } }] })
-    .populate({
+const get_workout_queue = async (req, res, next) => {
+  try {
+    const clientId = req.query.clientId;
+    const startDate = req.query.startDate;
+    const userId = res.locals.user._id;
+    let targetUserId = userId;
+
+    if (clientId && String(clientId) !== String(userId)) {
+      const relationship = await Relationship.findOne({
+        trainer: userId,
+        client: clientId,
+        accepted: true,
+      });
+
+      if (!relationship) {
+        return res.status(403).json({ error: "Unauthorized access." });
+      }
+      targetUserId = clientId;
+    }
+
+    const workoutQuery = { user: targetUserId };
+    if (startDate) {
+      workoutQuery.date = { $gte: new Date(startDate) };
+    }
+
+    const workouts = await Training.find(workoutQuery).populate({
       path: "training.exercise",
       select: "_id exerciseTitle",
-    })
-    .then((data) => res.send(data))
-    .catch((err) => next(err));
+    });
+
+    if (!workouts.length) {
+      return res.send([]);
+    }
+
+    const workoutIds = workouts.map((workout) => workout._id);
+    const scheduledEvents = await ScheduleEvent.find({
+      workoutId: { $in: workoutIds },
+      status: { $ne: "CANCELLED" },
+    }).select("workoutId");
+
+    const scheduledSet = new Set(scheduledEvents.map((event) => String(event.workoutId)));
+    const filteredWorkouts = workouts.filter(
+      (workout) => !scheduledSet.has(String(workout._id))
+    );
+
+    return res.send(filteredWorkouts);
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const get_workouts_by_date = async (req, res, next) => {

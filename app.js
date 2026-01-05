@@ -13,6 +13,8 @@ const trainingRoutes = require("./routes/trainingRoutes");
 const relationshipRoutes = require("./routes/relationshipRoutes");
 const goalRoutes = require("./routes/goalRoutes");
 const conversationRoutes = require("./routes/conversationRoutes");
+const scheduleRoutes = require("./routes/scheduleRoutes");
+const sessionRoutes = require("./routes/sessionRoutes");
 const methodOverride = require("method-override");
 global.io = require("./io").initialize(http, {
   cors: {
@@ -50,6 +52,8 @@ app.use("/", trainingRoutes);
 app.use("/", relationshipRoutes);
 app.use("/", goalRoutes);
 app.use("/", conversationRoutes);
+app.use("/", scheduleRoutes);
+app.use("/", sessionRoutes);
 
 const connectedClients = {};
 
