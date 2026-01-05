@@ -64,7 +64,13 @@ const get_schedule_range = async (req, res, next) => {
         ],
       };
     } else if (clientId) {
-      query = { ...query, clientId };
+      query = {
+        ...query,
+        $or: [
+          { clientId },
+          ...(includeAvailability ? [{ eventType: "AVAILABILITY", status: "OPEN" }] : []),
+        ],
+      };
     }
 
     const events = await ScheduleEvent.find(query).lean();
