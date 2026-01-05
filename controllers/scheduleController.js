@@ -198,15 +198,24 @@ const request_booking = async (req, res, next) => {
       return res.status(403).json({ error: "Unauthorized access." });
     }
 
-    const availability = await ScheduleEvent.findById(availabilityEventId);
-    if (!availability || availability.eventType !== "AVAILABILITY") {
-      return res.status(404).json({ error: "Availability slot not found." });
-    }
-    if (availability.status !== "OPEN") {
-      return res.status(409).json({ error: "Availability slot is no longer open." });
-    }
-    if (String(availability.trainerId) !== String(trainerId)) {
-      return res.status(400).json({ error: "Trainer mismatch." });
+  const availability = await ScheduleEvent.findById(availabilityEventId);
+  if (!availability || availability.eventType !== "AVAILABILITY") {
+    return res.status(404).json({ error: "Availability slot not found." });
+  }
+  if (availability.status !== "OPEN") {
+    return res.status(409).json({ error: "Availability slot is no longer open." });
+  }
+  if (String(availability.trainerId) !== String(trainerId)) {
+    return res.status(400).json({ error: "Trainer mismatch." });
+  }
+
+    const availabilityStart = new Date(availability.startDateTime);
+    const availabilityEnd = new Date(availability.endDateTime);
+    const requestedStart = new Date(startDateTime);
+    const requestedEnd = new Date(endDateTime);
+
+    if (requestedStart < availabilityStart || requestedEnd > availabilityEnd) {
+      return res.status(400).json({ error: "Requested time is outside availability range." });
     }
 
     if (isRecurring) {
@@ -229,20 +238,11 @@ const request_booking = async (req, res, next) => {
       return res.status(409).json({ error: "Requested time conflicts with an existing booking." });
     }
 
-    if (!isRecurring && availability.availabilitySource === "MANUAL" && !availability.recurrenceRule) {
-      availability.eventType = "APPOINTMENT";
-      availability.status = "REQUESTED";
-      availability.clientId = userId;
-      availability.requestedBy = userId;
-      const updated = await availability.save();
-      return res.json({ event: updated });
-    }
-
     const appointment = new ScheduleEvent({
       trainerId,
       clientId: userId,
-      startDateTime: start,
-      endDateTime: end,
+      startDateTime: requestedStart,
+      endDateTime: requestedEnd,
       eventType: "APPOINTMENT",
       status: "REQUESTED",
       recurrenceRule: isRecurring ? recurrenceRule || availability.recurrenceRule : null,
@@ -252,6 +252,40 @@ const request_booking = async (req, res, next) => {
     });
 
     const saved = await appointment.save();
+
+    if (!availability.recurrenceRule && availability.availabilitySource === "MANUAL") {
+      const remaining = [];
+      if (requestedStart > availabilityStart) {
+        remaining.push({
+          startDateTime: availabilityStart,
+          endDateTime: requestedStart,
+        });
+      }
+      if (requestedEnd < availabilityEnd) {
+        remaining.push({
+          startDateTime: requestedEnd,
+          endDateTime: availabilityEnd,
+        });
+      }
+
+      await ScheduleEvent.findByIdAndDelete(availability._id);
+
+      if (remaining.length > 0) {
+        await Promise.all(
+          remaining.map((slot) =>
+            new ScheduleEvent({
+              trainerId,
+              clientId: null,
+              eventType: "AVAILABILITY",
+              status: "OPEN",
+              availabilitySource: "MANUAL",
+              startDateTime: slot.startDateTime,
+              endDateTime: slot.endDateTime,
+            }).save()
+          )
+        );
+      }
+    }
     return res.json({ event: saved });
   } catch (err) {
     return next(err);
@@ -315,11 +349,33 @@ const get_schedule_event_by_id = async (req, res, next) => {
   }
 };
 
+const delete_schedule_event = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { _id } = req.body;
+
+    const existing = await ScheduleEvent.findById(_id);
+    if (!existing) {
+      return res.status(404).json({ error: "Schedule event not found." });
+    }
+
+    if (String(existing.trainerId) !== String(userId)) {
+      return res.status(403).json({ error: "Unauthorized access." });
+    }
+
+    await ScheduleEvent.findByIdAndDelete(_id);
+    return res.json({ status: "deleted" });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   get_schedule_range,
   create_schedule_event,
   update_schedule_event,
   cancel_schedule_event,
+  delete_schedule_event,
   request_booking,
   respond_booking,
   get_schedule_event_by_id,
