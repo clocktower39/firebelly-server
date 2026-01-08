@@ -292,6 +292,106 @@ const request_booking = async (req, res, next) => {
   }
 };
 
+const trainer_book_availability = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { availabilityEventId, clientId, startDateTime, endDateTime, workoutId } = req.body;
+
+    if (!availabilityEventId || !clientId || !startDateTime || !endDateTime) {
+      return res.status(400).json({ error: "Missing booking fields." });
+    }
+
+    const relationship = await ensureRelationship(userId, clientId);
+    if (!relationship) {
+      return res.status(403).json({ error: "Unauthorized access." });
+    }
+
+    const availability = await ScheduleEvent.findById(availabilityEventId);
+    if (!availability || availability.eventType !== "AVAILABILITY") {
+      return res.status(404).json({ error: "Availability slot not found." });
+    }
+    if (availability.status !== "OPEN") {
+      return res.status(409).json({ error: "Availability slot is no longer open." });
+    }
+    if (String(availability.trainerId) !== String(userId)) {
+      return res.status(400).json({ error: "Trainer mismatch." });
+    }
+
+    const availabilityStart = new Date(availability.startDateTime);
+    const availabilityEnd = new Date(availability.endDateTime);
+    const requestedStart = new Date(startDateTime);
+    const requestedEnd = new Date(endDateTime);
+
+    if (requestedStart < availabilityStart || requestedEnd > availabilityEnd) {
+      return res.status(400).json({ error: "Requested time is outside availability range." });
+    }
+
+    const conflict = await ScheduleEvent.findOne({
+      trainerId: userId,
+      eventType: "APPOINTMENT",
+      status: { $in: APPOINTMENT_STATUSES },
+      startDateTime: { $lt: requestedEnd },
+      endDateTime: { $gt: requestedStart },
+    });
+
+    if (conflict) {
+      return res.status(409).json({ error: "Requested time conflicts with an existing booking." });
+    }
+
+    const appointment = new ScheduleEvent({
+      trainerId: userId,
+      clientId,
+      startDateTime: requestedStart,
+      endDateTime: requestedEnd,
+      eventType: "APPOINTMENT",
+      status: "BOOKED",
+      availabilitySource: availability.availabilitySource,
+      workoutId: workoutId || null,
+      requestedBy: userId,
+    });
+
+    const saved = await appointment.save();
+
+    if (!availability.recurrenceRule && availability.availabilitySource === "MANUAL") {
+      const remaining = [];
+      if (requestedStart > availabilityStart) {
+        remaining.push({
+          startDateTime: availabilityStart,
+          endDateTime: requestedStart,
+        });
+      }
+      if (requestedEnd < availabilityEnd) {
+        remaining.push({
+          startDateTime: requestedEnd,
+          endDateTime: availabilityEnd,
+        });
+      }
+
+      await ScheduleEvent.findByIdAndDelete(availability._id);
+
+      if (remaining.length > 0) {
+        await Promise.all(
+          remaining.map((slot) =>
+            new ScheduleEvent({
+              trainerId: userId,
+              clientId: null,
+              eventType: "AVAILABILITY",
+              status: "OPEN",
+              availabilitySource: "MANUAL",
+              startDateTime: slot.startDateTime,
+              endDateTime: slot.endDateTime,
+            }).save()
+          )
+        );
+      }
+    }
+
+    return res.json({ event: saved });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 const respond_booking = async (req, res, next) => {
   try {
     const userId = res.locals.user._id;
@@ -377,6 +477,7 @@ module.exports = {
   cancel_schedule_event,
   delete_schedule_event,
   request_booking,
+  trainer_book_availability,
   respond_booking,
   get_schedule_event_by_id,
 };

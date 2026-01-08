@@ -10,6 +10,7 @@ router.post("/schedule/event/cancel", verifyAccessToken, scheduleController.canc
 router.post("/schedule/event/delete", verifyAccessToken, scheduleController.delete_schedule_event);
 router.post("/schedule/event", verifyAccessToken, scheduleController.get_schedule_event_by_id);
 router.post("/schedule/book/request", verifyAccessToken, scheduleController.request_booking);
+router.post("/schedule/book/trainer", verifyAccessToken, scheduleController.trainer_book_availability);
 router.post("/schedule/book/respond", verifyAccessToken, scheduleController.respond_booking);
 
 module.exports = router;
