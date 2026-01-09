@@ -90,7 +90,18 @@ const get_schedule_range = async (req, res, next) => {
         return !booked.some((appt) => overlaps(appt, event.startDateTime, event.endDateTime));
       });
 
-      return res.json({ events: filtered });
+      const busyAppointments = booked
+        .filter((appt) => String(appt.clientId) !== String(userId))
+        .map((appt) => ({
+          _id: `busy-${appt._id}`,
+          trainerId: appt.trainerId,
+          eventType: "APPOINTMENT",
+          status: "BOOKED",
+          startDateTime: appt.startDateTime,
+          endDateTime: appt.endDateTime,
+        }));
+
+      return res.json({ events: [...filtered, ...busyAppointments] });
     }
 
     return res.json({ events });
@@ -449,6 +460,39 @@ const get_schedule_event_by_id = async (req, res, next) => {
   }
 };
 
+const get_schedule_event_by_workout = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { workoutId } = req.body;
+
+    if (!workoutId) {
+      return res.status(400).json({ error: "Workout id is required." });
+    }
+
+    const event = await ScheduleEvent.findOne({
+      workoutId,
+      status: { $ne: "CANCELLED" },
+    })
+      .sort({ startDateTime: -1 })
+      .lean();
+
+    if (!event) {
+      return res.json({ event: null });
+    }
+
+    const isTrainer = String(event.trainerId) === String(userId);
+    const isClient = event.clientId && String(event.clientId) === String(userId);
+
+    if (!isTrainer && !isClient) {
+      return res.status(403).json({ error: "Unauthorized access." });
+    }
+
+    return res.json({ event });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 const delete_schedule_event = async (req, res, next) => {
   try {
     const userId = res.locals.user._id;
@@ -480,4 +524,5 @@ module.exports = {
   trainer_book_availability,
   respond_booking,
   get_schedule_event_by_id,
+  get_schedule_event_by_workout,
 };

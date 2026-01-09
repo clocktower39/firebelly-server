@@ -9,6 +9,7 @@ router.post("/schedule/event/update", verifyAccessToken, scheduleController.upda
 router.post("/schedule/event/cancel", verifyAccessToken, scheduleController.cancel_schedule_event);
 router.post("/schedule/event/delete", verifyAccessToken, scheduleController.delete_schedule_event);
 router.post("/schedule/event", verifyAccessToken, scheduleController.get_schedule_event_by_id);
+router.post("/schedule/event/by-workout", verifyAccessToken, scheduleController.get_schedule_event_by_workout);
 router.post("/schedule/book/request", verifyAccessToken, scheduleController.request_booking);
 router.post("/schedule/book/trainer", verifyAccessToken, scheduleController.trainer_book_availability);
 router.post("/schedule/book/respond", verifyAccessToken, scheduleController.respond_booking);
