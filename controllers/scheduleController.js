@@ -306,15 +306,28 @@ const request_booking = async (req, res, next) => {
 const trainer_book_availability = async (req, res, next) => {
   try {
     const userId = res.locals.user._id;
-    const { availabilityEventId, clientId, startDateTime, endDateTime, workoutId } = req.body;
+    const {
+      availabilityEventId,
+      clientId,
+      startDateTime,
+      endDateTime,
+      workoutId,
+      customClientName,
+      customClientEmail,
+      customClientPhone,
+    } = req.body;
 
-    if (!availabilityEventId || !clientId || !startDateTime || !endDateTime) {
+    const hasCustomName = Boolean(customClientName && String(customClientName).trim());
+
+    if (!availabilityEventId || (!clientId && !hasCustomName) || !startDateTime || !endDateTime) {
       return res.status(400).json({ error: "Missing booking fields." });
     }
 
-    const relationship = await ensureRelationship(userId, clientId);
-    if (!relationship) {
-      return res.status(403).json({ error: "Unauthorized access." });
+    if (clientId) {
+      const relationship = await ensureRelationship(userId, clientId);
+      if (!relationship) {
+        return res.status(403).json({ error: "Unauthorized access." });
+      }
     }
 
     const availability = await ScheduleEvent.findById(availabilityEventId);
@@ -351,13 +364,16 @@ const trainer_book_availability = async (req, res, next) => {
 
     const appointment = new ScheduleEvent({
       trainerId: userId,
-      clientId,
+      clientId: clientId || null,
       startDateTime: requestedStart,
       endDateTime: requestedEnd,
       eventType: "APPOINTMENT",
       status: "BOOKED",
       availabilitySource: availability.availabilitySource,
       workoutId: workoutId || null,
+      customClientName: hasCustomName ? String(customClientName).trim() : "",
+      customClientEmail: customClientEmail ? String(customClientEmail).trim() : "",
+      customClientPhone: customClientPhone ? String(customClientPhone).trim() : "",
       requestedBy: userId,
     });
 

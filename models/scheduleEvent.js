@@ -17,6 +17,9 @@ const scheduleEventSchema = new mongoose.Schema(
       required: true,
     },
     workoutId: { type: mongoose.Schema.Types.ObjectId, ref: "Training", default: null },
+    customClientName: { type: String, default: "" },
+    customClientEmail: { type: String, default: "" },
+    customClientPhone: { type: String, default: "" },
     recurrenceRule: { type: String, default: null },
     recurrenceGroupId: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
     availabilitySource: {
