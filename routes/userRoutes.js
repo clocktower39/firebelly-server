@@ -38,6 +38,7 @@ router.post('/resend-verification-email', userController.resend_verification_ema
 router.get('/trainers', verifyAccessToken, userController.get_trainers);
 router.post('/updateUser', verifyAccessToken, userController.update_user);
 router.post('/getUser', verifyAccessToken, userController.get_userInfo);
+router.get('/public/trainer/:id', userController.get_public_trainer_info);
 router.post('/changePassword', verifyAccessToken, userController.change_password);
 router.post('/user/upload/profilePicture', verifyAccessToken, uploadProfilePicture.single("file"), userController.upload_profile_picture);
 router.get('/user/profilePicture/:id', userController.get_profile_picture);

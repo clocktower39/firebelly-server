@@ -1,4 +1,6 @@
 const User = require("../models/user");
+const Relationship = require("../models/relationship");
+const ScheduleEvent = require("../models/scheduleEvent");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const crypto = require('crypto');
@@ -301,6 +303,35 @@ const get_userInfo = (req, res, next) => {
   }
 };
 
+const get_public_trainer_info = (req, res, next) => {
+  const { id } = req.params;
+
+  User.findById(id)
+    .then(async (user) => {
+      if (!user) {
+        return res.status(404).json({ error: "Trainer not found." });
+      }
+
+      if (!user.isTrainer) {
+        const [hasClients, hasEvents] = await Promise.all([
+          Relationship.exists({ trainer: id }),
+          ScheduleEvent.exists({ trainerId: id }),
+        ]);
+        if (!hasClients && !hasEvents) {
+          return res.status(404).json({ error: "Trainer not found." });
+        }
+      }
+
+      return res.json({
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profilePicture: user.profilePicture,
+      });
+    })
+    .catch((err) => next(err));
+};
+
 const get_trainers = (req, res, next) => {
   User.find({ isTrainer: true })
     .then((trainers) => {
@@ -429,6 +460,7 @@ module.exports = {
   update_user,
   checkAuthLoginToken,
   get_userInfo,
+  get_public_trainer_info,
   change_password,
   get_trainers,
   upload_profile_picture,

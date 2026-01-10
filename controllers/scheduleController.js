@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const ScheduleEvent = require("../models/scheduleEvent");
+const User = require("../models/user");
 const Relationship = require("../models/relationship");
 
 const APPOINTMENT_STATUSES = ["REQUESTED", "BOOKED", "COMPLETED"];
@@ -105,6 +106,56 @@ const get_schedule_range = async (req, res, next) => {
     }
 
     return res.json({ events });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const get_public_schedule_range = async (req, res, next) => {
+  try {
+    const { startDate, endDate, trainerId } = req.body;
+
+    if (!startDate || !endDate || !trainerId) {
+      return res.status(400).json({ error: "startDate, endDate, and trainerId are required." });
+    }
+
+    const trainer = await User.findById(trainerId).lean();
+    if (!trainer || !trainer.isTrainer) {
+      const [hasClients, hasEvents] = await Promise.all([
+        Relationship.exists({ trainer: trainerId }),
+        ScheduleEvent.exists({ trainerId }),
+      ]);
+      if (!hasClients && !hasEvents) {
+        return res.status(404).json({ error: "Trainer not found." });
+      }
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    const events = await ScheduleEvent.find({
+      trainerId,
+      startDateTime: { $lt: end },
+      endDateTime: { $gt: start },
+      status: { $ne: "CANCELLED" },
+    }).lean();
+
+    const sanitized = events
+      .filter((event) => {
+        if (event.eventType === "AVAILABILITY") return event.status === "OPEN";
+        return ["APPOINTMENT", "INDEPENDENT"].includes(event.eventType);
+      })
+      .map((event) => ({
+        _id: event._id,
+        trainerId: event.trainerId,
+        eventType: event.eventType === "AVAILABILITY" ? "AVAILABILITY" : "APPOINTMENT",
+        status: event.eventType === "AVAILABILITY" ? event.status : "BOOKED",
+        startDateTime: event.startDateTime,
+        endDateTime: event.endDateTime,
+        availabilitySource: event.availabilitySource || null,
+      }));
+
+    return res.json({ events: sanitized });
   } catch (err) {
     return next(err);
   }
@@ -537,6 +588,7 @@ module.exports = {
   cancel_schedule_event,
   delete_schedule_event,
   request_booking,
+  get_public_schedule_range,
   trainer_book_availability,
   respond_booking,
   get_schedule_event_by_id,
