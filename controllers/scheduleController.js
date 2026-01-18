@@ -13,6 +13,53 @@ const ensureRelationship = async (trainerId, clientId) => {
 const overlaps = (event, start, end) =>
   event.startDateTime < end && event.endDateTime > start;
 
+const merge_open_availability = async (event) => {
+  if (
+    !event ||
+    event.eventType !== "AVAILABILITY" ||
+    event.status !== "OPEN" ||
+    event.recurrenceRule ||
+    event.availabilitySource !== "MANUAL"
+  ) {
+    return event;
+  }
+
+  const start = new Date(event.startDateTime);
+  const end = new Date(event.endDateTime);
+
+  const candidates = await ScheduleEvent.find({
+    trainerId: event.trainerId,
+    eventType: "AVAILABILITY",
+    status: "OPEN",
+    availabilitySource: "MANUAL",
+    recurrenceRule: null,
+    _id: { $ne: event._id },
+    startDateTime: { $lte: end },
+    endDateTime: { $gte: start },
+  });
+
+  if (!candidates.length) return event;
+
+  let minStart = start;
+  let maxEnd = end;
+  const idsToDelete = [];
+
+  candidates.forEach((slot) => {
+    if (slot.startDateTime < minStart) minStart = slot.startDateTime;
+    if (slot.endDateTime > maxEnd) maxEnd = slot.endDateTime;
+    idsToDelete.push(slot._id);
+  });
+
+  await ScheduleEvent.deleteMany({ _id: { $in: idsToDelete } });
+  const merged = await ScheduleEvent.findByIdAndUpdate(
+    event._id,
+    { startDateTime: minStart, endDateTime: maxEnd },
+    { new: true }
+  );
+
+  return merged || event;
+};
+
 const get_schedule_range = async (req, res, next) => {
   try {
     const userId = res.locals.user._id;
@@ -206,7 +253,8 @@ const update_schedule_event = async (req, res, next) => {
       }
     }
 
-    const updated = await ScheduleEvent.findByIdAndUpdate(_id, updates, { new: true });
+    let updated = await ScheduleEvent.findByIdAndUpdate(_id, updates, { new: true });
+    updated = await merge_open_availability(updated);
     return res.json({ event: updated });
   } catch (err) {
     return next(err);
