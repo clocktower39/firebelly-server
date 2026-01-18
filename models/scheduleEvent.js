@@ -21,6 +21,8 @@ const scheduleEventSchema = new mongoose.Schema(
     customClientEmail: { type: String, default: "" },
     customClientPhone: { type: String, default: "" },
     publicLabel: { type: String, default: "" },
+    priceAmount: { type: Number, default: null },
+    priceCurrency: { type: String, default: "USD" },
     recurrenceRule: { type: String, default: null },
     recurrenceGroupId: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
     availabilitySource: {
