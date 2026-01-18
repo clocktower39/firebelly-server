@@ -20,6 +20,7 @@ const scheduleEventSchema = new mongoose.Schema(
     customClientName: { type: String, default: "" },
     customClientEmail: { type: String, default: "" },
     customClientPhone: { type: String, default: "" },
+    publicLabel: { type: String, default: "" },
     recurrenceRule: { type: String, default: null },
     recurrenceGroupId: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
     availabilitySource: {

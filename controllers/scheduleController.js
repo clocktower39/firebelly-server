@@ -200,6 +200,7 @@ const get_public_schedule_range = async (req, res, next) => {
         startDateTime: event.startDateTime,
         endDateTime: event.endDateTime,
         availabilitySource: event.availabilitySource || null,
+        publicLabel: event.publicLabel || "",
       }));
 
     return res.json({ events: sanitized });
