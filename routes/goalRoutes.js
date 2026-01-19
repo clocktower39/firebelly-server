@@ -10,5 +10,6 @@ router.post('/createGoal', verifyAccessToken, goalController.create_goal);
 router.post('/removeGoal', verifyAccessToken, goalController.remove_goal);
 router.post('/updateGoal', verifyAccessToken, goalController.update_goal);
 router.post('/commentGoal', verifyAccessToken, goalController.comment_on_goal);
+router.post('/removeGoalComment', verifyAccessToken, goalController.remove_comment);
 
 module.exports = router;

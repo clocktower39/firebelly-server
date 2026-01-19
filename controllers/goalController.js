@@ -10,8 +10,11 @@ const create_goal = (req, res, next) => {
 
   goal
     .save()
-    .then((savedGoal) => {
-      res.send(savedGoal);
+    .then((savedGoal) =>
+      Goal.findById(savedGoal._id).populate("comments.user", "firstName lastName profilePicture")
+    )
+    .then((populatedGoal) => {
+      res.send(populatedGoal);
     })
     .catch((err) => next(err));
 };
@@ -60,8 +63,37 @@ const comment_on_goal = (req, res, next) => {
 
       return goal.save();
     })
-    .then((savedGoal) => {
-      res.send(savedGoal);
+    .then((savedGoal) =>
+      Goal.findById(savedGoal._id).populate("comments.user", "firstName lastName profilePicture")
+    )
+    .then((populatedGoal) => {
+      res.send(populatedGoal);
+    })
+    .catch((err) => next(err));
+};
+
+const remove_comment = (req, res, next) => {
+  const { _id, commentId } = req.body;
+  Goal.findById(_id)
+    .then((goal) => {
+      if (!goal) {
+        return res.status(404).send({ error: "Goal not found" });
+      }
+      const targetComment = goal.comments?.id(commentId);
+      if (!targetComment) {
+        return res.status(404).send({ error: "Comment not found" });
+      }
+      if (String(targetComment.user) !== String(res.locals.user._id)) {
+        return res.status(403).send({ error: "Not authorized to delete this comment" });
+      }
+      goal.comments.pull(commentId);
+      return goal.save();
+    })
+    .then((savedGoal) =>
+      Goal.findById(savedGoal._id).populate("comments.user", "firstName lastName profilePicture")
+    )
+    .then((populatedGoal) => {
+      res.send(populatedGoal);
     })
     .catch((err) => next(err));
 };
@@ -101,5 +133,6 @@ module.exports = {
   update_goal,
   get_goals,
   comment_on_goal,
+  remove_comment,
   get_client_goals,
 };
