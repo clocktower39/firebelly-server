@@ -140,6 +140,7 @@ const get_workout_queue = async (req, res, next) => {
   }
 };
 
+
 const get_workouts_by_date = async (req, res, next) => {
   const { client } = req.body;
   const user = res.locals.user;
@@ -562,6 +563,27 @@ const workout_month_request = async (req, res, next) => {
   }
 };
 
+const workout_templates_request = async (req, res, next) => {
+  try {
+    const user = res.locals.user;
+
+    const workouts = await Training.find({
+      user: user._id,
+      isTemplate: true,
+    })
+      .populate({
+        path: "training.exercise",
+        model: "Exercise",
+        select: "_id exerciseTitle",
+      })
+      .lean();
+
+    return res.json({ workouts, user });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 const workout_year_request = async (req, res, next) => {
   try {
     const { client, year } = req.body;
@@ -633,7 +655,6 @@ module.exports = {
   create_training,
   update_training,
   get_training_by_id,
-  get_workout_queue,
   get_workouts_by_date,
   get_weekly_training,
   get_exercise_list,
@@ -643,5 +664,7 @@ module.exports = {
   workout_history_request,
   workout_month_request,
   workout_year_request,
+  workout_templates_request,
+  get_workout_queue,
   update_workout_date_by_id,
 };
