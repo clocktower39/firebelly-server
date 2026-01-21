@@ -140,6 +140,7 @@ const get_workout_queue = async (req, res, next) => {
   }
 };
 
+
 const get_workouts_by_date = async (req, res, next) => {
   const { client } = req.body;
   const user = res.locals.user;
@@ -562,6 +563,78 @@ const workout_month_request = async (req, res, next) => {
   }
 };
 
+const workout_templates_request = async (req, res, next) => {
+  try {
+    const user = res.locals.user;
+
+    const workouts = await Training.find({
+      user: user._id,
+      isTemplate: true,
+    })
+      .populate({
+        path: "training.exercise",
+        model: "Exercise",
+        select: "_id exerciseTitle",
+      })
+      .lean();
+
+    return res.json({ workouts, user });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const workout_year_request = async (req, res, next) => {
+  try {
+    const { client, year } = req.body;
+    const user = res.locals.user;
+
+    const base = dayjs(`${year}-01-01`).utc();
+    const startDate = base.startOf("year").toDate();
+    const endDate = base.startOf("year").add(1, "year").toDate();
+
+    let targetUser = user;
+
+    if (client._id !== user._id) {
+      const relationship = await Relationship.findOne({
+        trainer: user._id,
+        client,
+        accepted: true,
+      }).populate({
+        path: "client",
+        model: "User",
+        select: "_id firstName lastName profilePicture",
+      });
+
+      if (!relationship) {
+        return res.status(403).json({ error: "Unauthorized access." });
+      }
+
+      targetUser = relationship.client;
+    }
+
+    const workouts = await Training.find({
+      user: targetUser._id,
+      date: { $gte: startDate, $lt: endDate },
+    })
+      .populate({
+        path: "user workoutFeedback.comments.user workoutFeedback.comments.deletedBy training.feedback.comments.user training.feedback.comments.deletedBy",
+        model: "User",
+        select: "_id firstName lastName profilePicture",
+      })
+      .populate({
+        path: "training.exercise",
+        model: "Exercise",
+        select: "_id exerciseTitle",
+      })
+      .lean();
+
+    return res.json({ workouts, user: targetUser });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 const checkClientRelationship = (trainerId, clientId) => {
   return Relationship.findOne({ trainer: trainerId, client: clientId })
     .then((relationship) => {
@@ -582,7 +655,6 @@ module.exports = {
   create_training,
   update_training,
   get_training_by_id,
-  get_workout_queue,
   get_workouts_by_date,
   get_weekly_training,
   get_exercise_list,
@@ -591,5 +663,8 @@ module.exports = {
   delete_workout_by_id,
   workout_history_request,
   workout_month_request,
+  workout_year_request,
+  workout_templates_request,
+  get_workout_queue,
   update_workout_date_by_id,
 };

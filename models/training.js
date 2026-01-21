@@ -82,6 +82,7 @@ const trainingSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    isTemplate: { type: Boolean, default: false },
     complete: { type: Boolean, default: false },
   },
   { minimize: false }

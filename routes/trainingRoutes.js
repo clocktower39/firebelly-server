@@ -15,6 +15,8 @@ router.post('/updateWorkoutDateById', verifyAccessToken, trainingController.upda
 router.post('/deleteWorkoutById', verifyAccessToken, trainingController.delete_workout_by_id);
 router.post('/getWorkoutHistory', verifyAccessToken, trainingController.workout_history_request);
 router.post('/workoutMonth', verifyAccessToken, trainingController.workout_month_request);
+router.post('/workoutYear', verifyAccessToken, trainingController.workout_year_request);
+router.post('/workoutTemplates', verifyAccessToken, trainingController.workout_templates_request);
 router.get('/getWorkoutQueue', verifyAccessToken, trainingController.get_workout_queue);
 
 module.exports = router;
