@@ -13,5 +13,6 @@ router.put(
   programController.update_program_day
 );
 router.post("/programs/:id/publish", verifyAccessToken, programController.publish_program);
+router.post("/programs/:id/assign", verifyAccessToken, programController.assign_program);
 
 module.exports = router;
