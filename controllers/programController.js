@@ -172,7 +172,7 @@ const list_programs = async (req, res, next) => {
 
 const assign_program = async (req, res, next) => {
   try {
-    const { clientId, startDate } = req.body;
+    const { clientId, startDate, dayMap } = req.body;
     const trainerId = res.locals.user._id;
 
     if (!clientId || !startDate) {
@@ -197,6 +197,16 @@ const assign_program = async (req, res, next) => {
     }
 
     const baseDate = dayjs(startDate).utc().startOf("day");
+    const baseWeekday = baseDate.day();
+    const resolvedDayMap = Array.isArray(dayMap) && dayMap.length
+      ? dayMap.map((value) => Number(value))
+      : null;
+    if (resolvedDayMap && resolvedDayMap.length !== program.daysPerWeek) {
+      return res.status(400).json({ error: "Day mapping must match days per week." });
+    }
+    if (resolvedDayMap && resolvedDayMap.some((value) => Number.isNaN(value) || value < 0 || value > 6)) {
+      return res.status(400).json({ error: "Day mapping must use weekday values 0-6." });
+    }
     const workoutIds = [];
     program.weeks.forEach((week) => {
       week.forEach((day) => {
@@ -213,7 +223,10 @@ const assign_program = async (req, res, next) => {
         if (!day.workoutId) return;
         const template = templateMap.get(String(day.workoutId));
         if (!template) return;
-        const date = baseDate.add(weekIdx * 7 + dayIdx, "day").toDate();
+        const targetWeekday = resolvedDayMap ? resolvedDayMap[dayIdx] : baseWeekday + dayIdx;
+        const rawOffset = targetWeekday - baseWeekday;
+        const dayOffset = rawOffset < 0 ? rawOffset + 7 : rawOffset;
+        const date = baseDate.add(weekIdx * 7 + dayOffset, "day").toDate();
         newWorkouts.push({
           title: template.title || `${program.title} • Week ${weekIdx + 1} Day ${dayIdx + 1}`,
           date,
