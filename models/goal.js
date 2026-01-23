@@ -3,9 +3,15 @@ const mongoose = require("mongoose");
 const goalSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   title: { type: String, required: true, index: { unique: true } },
-  description: { type: String, required: true },
+  description: { type: String },
+  category: { type: String, enum: ["Strength", "Cardio", "Skill", "Weight", ""], default: "" },
+  // Strength goal specific fields
+  exercise: { type: mongoose.Schema.Types.ObjectId, ref: "Exercise" },
+  targetWeight: { type: Number },
+  targetReps: { type: Number },
   targetDate: { type: Date },
   achievedDate: { type: Date },
+  achievementSeen: { type: Boolean, default: false },
   createdDate: { type: Date, required: true },
   comments: {
     type: [
