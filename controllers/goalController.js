@@ -71,11 +71,23 @@ const remove_goal = (req, res, next) => {
 };
 
 const update_goal = (req, res, next) => {
-  const { title, description, category, exercise, targetWeight, targetReps, achievedDate, targetDate } = req.body;
+  const {
+    title,
+    description,
+    category,
+    exercise,
+    targetWeight,
+    targetReps,
+    achievedDate,
+    targetDate,
+    distanceUnit,
+    distanceValue,
+    goalTime,
+  } = req.body;
 
   Goal.findByIdAndUpdate(
     req.body._id,
-    { title, description, category, exercise, targetWeight, targetReps, achievedDate, targetDate },
+    { title, description, category, exercise, targetWeight, targetReps, achievedDate, targetDate, distanceUnit, distanceValue, goalTime },
     { new: true }
   )
     .populate("exercise", "_id exerciseTitle")
