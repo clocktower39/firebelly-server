@@ -77,6 +77,9 @@ const get_my_relationships = async (req, res, next) => {
   const trainerInfo = trainers.map((t) => {
     const accepted = relationships.filter((r) => r.trainer.toString() === t._id.toString())[0]
       .accepted;
+    const metricsApprovalRequired = relationships.filter(
+      (r) => r.trainer.toString() === t._id.toString()
+    )[0]?.metricsApprovalRequired ?? true;
 
     return {
       firstName: t.firstName,
@@ -84,6 +87,7 @@ const get_my_relationships = async (req, res, next) => {
       trainer: t._id,
       profilePicture: t.profilePicture,
       accepted,
+      metricsApprovalRequired,
     };
   });
   res.send(trainerInfo);
@@ -115,6 +119,21 @@ const remove_relationship = (req, res, next) => {
   }
 };
 
+const update_metrics_approval = (req, res, next) => {
+  const { trainer, metricsApprovalRequired } = req.body;
+
+  Relationship.findOneAndUpdate(
+    { trainer, client: res.locals.user._id },
+    { metricsApprovalRequired },
+    { new: true }
+  )
+    .then((data) => {
+      if (!data) return res.status(404).send({ message: "Relationship not found." });
+      res.send({ status: "success", relationship: data });
+    })
+    .catch((err) => next(err));
+};
+
 module.exports = {
   manage_relationship,
   change_relationship_status,
@@ -122,4 +141,5 @@ module.exports = {
   get_my_relationships,
   get_my_clients,
   remove_relationship,
+  update_metrics_approval,
 };

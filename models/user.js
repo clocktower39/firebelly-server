@@ -18,6 +18,8 @@ const UserSchema = new mongoose.Schema({
         ref: "profilePictures.files"
     },
     themeMode: { type: String, required: true, default: 'light', },
+    weeklyFrequency: { type: Number, min: 1, max: 7 },
+    preferredWorkoutDays: { type: [Number], default: [] },
     verified: {
         isVerified: { type: Boolean, default: false },
         verificationToken: { type: String, default: null },
