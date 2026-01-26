@@ -19,6 +19,15 @@ const relationshipStatus = {
     }),
 }
 
+const metricsApprovalStatus = {
+    body: Joi.object({
+        trainer: Joi.string()
+            .required(),
+        metricsApprovalRequired: Joi.bool()
+            .required(),
+    }),
+}
+
 
 const router = express.Router();
 
@@ -28,5 +37,6 @@ router.get('/relationships/myClients', verifyAccessToken, relationshipController
 router.post('/changeRelationshipStatus', validate(relationshipStatus, {}, {}), verifyAccessToken, relationshipController.change_relationship_status);
 router.post('/manageRelationship', validate(relationshipValidate, {}, {}), verifyAccessToken, relationshipController.manage_relationship);
 router.post('/removeRelationship', verifyAccessToken, relationshipController.remove_relationship);
+router.post('/relationships/metricsApproval', validate(metricsApprovalStatus, {}, {}), verifyAccessToken, relationshipController.update_metrics_approval);
 
 module.exports = router;

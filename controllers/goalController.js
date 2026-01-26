@@ -83,11 +83,25 @@ const update_goal = (req, res, next) => {
     distanceUnit,
     distanceValue,
     goalTime,
+    goalWeight,
   } = req.body;
 
   Goal.findByIdAndUpdate(
     req.body._id,
-    { title, description, category, exercise, targetWeight, targetReps, achievedDate, targetDate, distanceUnit, distanceValue, goalTime },
+    {
+      title,
+      description,
+      category,
+      exercise,
+      targetWeight,
+      targetReps,
+      achievedDate,
+      targetDate,
+      distanceUnit,
+      distanceValue,
+      goalTime,
+      goalWeight,
+    },
     { new: true }
   )
     .populate("exercise", "_id exerciseTitle")

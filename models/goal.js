@@ -8,6 +8,7 @@ const goalSchema = new mongoose.Schema({
   distanceUnit: { type: String, enum: ["Miles", "Kilometers", "Meters", "Yards", ""], default: "" },
   distanceValue: { type: Number },
   goalTime: { type: String },
+  goalWeight: { type: Number },
   // Strength goal specific fields
   exercise: { type: mongoose.Schema.Types.ObjectId, ref: "Exercise" },
   targetWeight: { type: Number },
