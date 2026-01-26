@@ -11,5 +11,7 @@ router.post('/removeGoal', verifyAccessToken, goalController.remove_goal);
 router.post('/updateGoal', verifyAccessToken, goalController.update_goal);
 router.post('/commentGoal', verifyAccessToken, goalController.comment_on_goal);
 router.post('/removeGoalComment', verifyAccessToken, goalController.remove_comment);
+router.post('/goals/exerciseMaxAtReps', verifyAccessToken, goalController.get_exercise_max_at_reps);
+router.post('/goals/markAchievementSeen', verifyAccessToken, goalController.mark_achievement_seen);
 
 module.exports = router;

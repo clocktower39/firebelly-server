@@ -158,13 +158,63 @@ const publish_program = async (req, res, next) => {
 const list_programs = async (req, res, next) => {
   try {
     const statusFilter = req.query.status;
-    const query = { ownerId: res.locals.user._id };
+    const includeShared = req.query.includeShared === "true";
+    const userId = res.locals.user._id;
+
+    const query = { ownerId: userId };
     if (statusFilter) {
       query.status = String(statusFilter).toUpperCase();
     }
-    const programs = await Program.find(query)
-      .sort({ updatedAt: -1 });
-    return res.json(programs);
+
+    const ownPrograms = await Program.find(query)
+      .populate({
+        path: "ownerId",
+        model: "User",
+        select: "_id firstName lastName",
+      })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const ownWithFlag = ownPrograms.map((p) => ({ ...p, isOwn: true }));
+
+    if (!includeShared) {
+      return res.json(ownWithFlag);
+    }
+
+    // Get connected trainer IDs with program permissions
+    const TrainerConnection = require("../models/trainerConnection");
+    const connections = await TrainerConnection.find({
+      $or: [{ requester: userId }, { recipient: userId }],
+      status: "accepted",
+      permissions: "programs",
+    }).lean();
+
+    const connectedTrainerIds = connections.map((c) =>
+      c.requester.toString() === userId.toString() ? c.recipient : c.requester
+    );
+
+    if (connectedTrainerIds.length === 0) {
+      return res.json(ownWithFlag);
+    }
+
+    // Get shared programs (only published) from connected trainers
+    const sharedQuery = {
+      ownerId: { $in: connectedTrainerIds },
+      status: "PUBLISHED",
+    };
+
+    const sharedPrograms = await Program.find(sharedQuery)
+      .populate({
+        path: "ownerId",
+        model: "User",
+        select: "_id firstName lastName",
+      })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const sharedWithFlag = sharedPrograms.map((p) => ({ ...p, isOwn: false, isShared: true }));
+
+    return res.json([...ownWithFlag, ...sharedWithFlag]);
   } catch (err) {
     return next(err);
   }

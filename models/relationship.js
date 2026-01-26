@@ -5,6 +5,7 @@ const relationshipSchema = new mongoose.Schema({
   client: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   requestedBy: { type: String, required: true },
   accepted: { type: Boolean, required: true },
+  metricsApprovalRequired: { type: Boolean, default: true },
 })
 
 const Relationship = mongoose.model('Relationship', relationshipSchema);
