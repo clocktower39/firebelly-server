@@ -2,12 +2,28 @@ const mongoose = require("mongoose");
 const ScheduleEvent = require("../models/scheduleEvent");
 const User = require("../models/user");
 const Relationship = require("../models/relationship");
+const SessionType = require("../models/sessionType");
 
 const APPOINTMENT_STATUSES = ["REQUESTED", "BOOKED", "COMPLETED"];
 
 const ensureRelationship = async (trainerId, clientId) => {
   if (!trainerId || !clientId) return null;
   return Relationship.findOne({ trainer: trainerId, client: clientId, accepted: true });
+};
+
+const normalizePrice = (amount, currency) => {
+  if (amount === undefined) return {};
+  const numeric = amount === "" || amount === null ? null : Number(amount);
+  return {
+    priceAmount: Number.isFinite(numeric) ? numeric : null,
+    priceCurrency: currency || "USD",
+  };
+};
+
+const resolveSessionType = async (trainerId, sessionTypeId) => {
+  if (!sessionTypeId) return null;
+  const type = await SessionType.findOne({ _id: sessionTypeId, trainerId });
+  return type ? type._id : null;
 };
 
 const overlaps = (event, start, end) =>
@@ -225,6 +241,14 @@ const create_schedule_event = async (req, res, next) => {
       }
     }
 
+    if (!payload.sessionTypeId) {
+      payload.sessionTypeId = null;
+    } else {
+      payload.sessionTypeId = await resolveSessionType(userId, payload.sessionTypeId);
+    }
+    if (payload.priceAmount !== undefined || payload.priceCurrency !== undefined) {
+      Object.assign(payload, normalizePrice(payload.priceAmount, payload.priceCurrency));
+    }
     const scheduleEvent = new ScheduleEvent(payload);
     const saved = await scheduleEvent.save();
     return res.json({ event: saved });
@@ -254,6 +278,15 @@ const update_schedule_event = async (req, res, next) => {
       }
     }
 
+    if (updates?.sessionTypeId !== undefined) {
+      const requestedId = updates.sessionTypeId || null;
+      updates.sessionTypeId = requestedId
+        ? await resolveSessionType(userId, requestedId)
+        : null;
+    }
+    if (updates?.priceAmount !== undefined || updates?.priceCurrency !== undefined) {
+      Object.assign(updates, normalizePrice(updates.priceAmount, updates.priceCurrency));
+    }
     let updated = await ScheduleEvent.findByIdAndUpdate(_id, updates, { new: true });
     updated = await merge_open_availability(updated);
     return res.json({ event: updated });
@@ -415,6 +448,7 @@ const trainer_book_availability = async (req, res, next) => {
       customClientName,
       customClientEmail,
       customClientPhone,
+      sessionTypeId,
     } = req.body;
 
     const hasCustomName = Boolean(customClientName && String(customClientName).trim());
@@ -462,6 +496,7 @@ const trainer_book_availability = async (req, res, next) => {
       return res.status(409).json({ error: "Requested time conflicts with an existing booking." });
     }
 
+    const resolvedSessionTypeId = await resolveSessionType(userId, sessionTypeId);
     const appointment = new ScheduleEvent({
       trainerId: userId,
       clientId: clientId || null,
@@ -471,6 +506,7 @@ const trainer_book_availability = async (req, res, next) => {
       status: "BOOKED",
       availabilitySource: availability.availabilitySource,
       workoutId: workoutId || null,
+      sessionTypeId: resolvedSessionTypeId,
       customClientName: hasCustomName ? String(customClientName).trim() : "",
       customClientEmail: customClientEmail ? String(customClientEmail).trim() : "",
       customClientPhone: customClientPhone ? String(customClientPhone).trim() : "",
