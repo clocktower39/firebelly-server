@@ -7,6 +7,8 @@ const sessionTypeSchema = new mongoose.Schema(
     description: { type: String, default: "" },
     defaultPrice: { type: Number, default: 0, min: 0 },
     currency: { type: String, enum: ["USD", "EUR", "JPY"], default: "USD" },
+    defaultPayout: { type: Number, default: 0, min: 0 },
+    payoutCurrency: { type: String, enum: ["USD", "EUR", "JPY"], default: "USD" },
   },
   { timestamps: true }
 );
