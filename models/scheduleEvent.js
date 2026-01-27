@@ -23,6 +23,8 @@ const scheduleEventSchema = new mongoose.Schema(
     publicLabel: { type: String, default: "" },
     priceAmount: { type: Number, default: null },
     priceCurrency: { type: String, default: "USD" },
+    payoutAmount: { type: Number, default: null },
+    payoutCurrency: { type: String, default: "USD" },
     recurrenceRule: { type: String, default: null },
     recurrenceGroupId: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
     availabilitySource: {
@@ -36,6 +38,8 @@ const scheduleEventSchema = new mongoose.Schema(
     sessionTypeId: { type: mongoose.Schema.Types.ObjectId, ref: "SessionType", default: null },
     priceAmount: { type: Number, default: null, min: 0 },
     priceCurrency: { type: String, enum: ["USD", "EUR", "JPY"], default: "USD" },
+    payoutAmount: { type: Number, default: null, min: 0 },
+    payoutCurrency: { type: String, enum: ["USD", "EUR", "JPY"], default: "USD" },
   },
   { timestamps: true }
 );

@@ -21,7 +21,7 @@ const create_session_type = async (req, res, next) => {
     if (!ensureTrainer(user)) {
       return res.status(403).json({ error: "Trainer access required." });
     }
-    const { name, description, defaultPrice, currency } = req.body;
+    const { name, description, defaultPrice, currency, defaultPayout, payoutCurrency } = req.body;
     if (!name || !String(name).trim()) {
       return res.status(400).json({ error: "Name is required." });
     }
@@ -31,6 +31,8 @@ const create_session_type = async (req, res, next) => {
       description: description ? String(description).trim() : "",
       defaultPrice: Number.isFinite(Number(defaultPrice)) ? Number(defaultPrice) : 0,
       currency: currency || "USD",
+      defaultPayout: Number.isFinite(Number(defaultPayout)) ? Number(defaultPayout) : 0,
+      payoutCurrency: payoutCurrency || "USD",
     });
     const saved = await sessionType.save();
     return res.json({ sessionType: saved });
@@ -46,7 +48,7 @@ const update_session_type = async (req, res, next) => {
       return res.status(403).json({ error: "Trainer access required." });
     }
     const { id } = req.params;
-    const { name, description, defaultPrice, currency } = req.body;
+    const { name, description, defaultPrice, currency, defaultPayout, payoutCurrency } = req.body;
     const existing = await SessionType.findById(id);
     if (!existing || String(existing.trainerId) !== String(user._id)) {
       return res.status(404).json({ error: "Session type not found." });
@@ -58,6 +60,10 @@ const update_session_type = async (req, res, next) => {
         ? { defaultPrice: Number.isFinite(Number(defaultPrice)) ? Number(defaultPrice) : 0 }
         : {}),
       ...(currency ? { currency } : {}),
+      ...(defaultPayout !== undefined
+        ? { defaultPayout: Number.isFinite(Number(defaultPayout)) ? Number(defaultPayout) : 0 }
+        : {}),
+      ...(payoutCurrency ? { payoutCurrency } : {}),
     };
     const updated = await SessionType.findByIdAndUpdate(id, updates, { new: true });
     return res.json({ sessionType: updated });

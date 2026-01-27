@@ -20,6 +20,15 @@ const normalizePrice = (amount, currency) => {
   };
 };
 
+const normalizePayout = (amount, currency) => {
+  if (amount === undefined) return {};
+  const numeric = amount === "" || amount === null ? null : Number(amount);
+  return {
+    payoutAmount: Number.isFinite(numeric) ? numeric : null,
+    payoutCurrency: currency || "USD",
+  };
+};
+
 const resolveSessionType = async (trainerId, sessionTypeId) => {
   if (!sessionTypeId) return null;
   const type = await SessionType.findOne({ _id: sessionTypeId, trainerId });
@@ -249,6 +258,9 @@ const create_schedule_event = async (req, res, next) => {
     if (payload.priceAmount !== undefined || payload.priceCurrency !== undefined) {
       Object.assign(payload, normalizePrice(payload.priceAmount, payload.priceCurrency));
     }
+    if (payload.payoutAmount !== undefined || payload.payoutCurrency !== undefined) {
+      Object.assign(payload, normalizePayout(payload.payoutAmount, payload.payoutCurrency));
+    }
     const scheduleEvent = new ScheduleEvent(payload);
     const saved = await scheduleEvent.save();
     return res.json({ event: saved });
@@ -286,6 +298,9 @@ const update_schedule_event = async (req, res, next) => {
     }
     if (updates?.priceAmount !== undefined || updates?.priceCurrency !== undefined) {
       Object.assign(updates, normalizePrice(updates.priceAmount, updates.priceCurrency));
+    }
+    if (updates?.payoutAmount !== undefined || updates?.payoutCurrency !== undefined) {
+      Object.assign(updates, normalizePayout(updates.payoutAmount, updates.payoutCurrency));
     }
     let updated = await ScheduleEvent.findByIdAndUpdate(_id, updates, { new: true });
     updated = await merge_open_availability(updated);
