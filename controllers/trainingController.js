@@ -168,7 +168,23 @@ const get_workouts_by_date = async (req, res, next) => {
 
   const targetUser = clientObj ?? user;
 
-  Training.find({ user: targetUser, date: req.body.date })
+  const dayStart = dayjs.utc(req.body.date).startOf("day").toDate();
+  const dayEnd = dayjs.utc(req.body.date).endOf("day").toDate();
+  const targetUserId = targetUser._id;
+  const targetUserObjectId = mongoose.Types.ObjectId.isValid(targetUserId)
+    ? new mongoose.Types.ObjectId(targetUserId)
+    : null;
+  const userMatch = targetUserObjectId ? { $in: [targetUserId, targetUserObjectId] } : targetUserId;
+
+  Training.find({
+    user: userMatch,
+    $expr: {
+      $and: [
+        { $gte: [{ $toDate: "$date" }, dayStart] },
+        { $lte: [{ $toDate: "$date" }, dayEnd] },
+      ],
+    },
+  })
     .populate({
       path: "training.exercise",
       model: "Exercise",
@@ -362,101 +378,103 @@ const update_workout_date_by_id = async (req, res, next) => {
   }
 };
 
-const copy_workout_by_id = (req, res, next) => {
-  const { newDate, _id, option = "exact", newTitle, newAccount } = req.body;
-
-  const modifyWorkout = (data, newDate, _id, option, newTitle, newAccount) => {
-    if (newTitle) data.title = newTitle;
-    if (newAccount) data.user = newAccount;
-
-    switch (option) {
-      case "achievedToNewGoal":
-        data.complete = false;
-        data.training.forEach((set) => {
-          set.forEach((exercise) => {
-            exercise.goals.exactReps = exercise.achieved.reps;
-            exercise.goals.weight = exercise.achieved.weight;
-            exercise.goals.percent = exercise.achieved.percent;
-            exercise.goals.seconds = exercise.achieved.seconds;
-            exercise.feedback = { difficulty: null, comments: [] };
-
-            for (const prop in exercise.achieved) {
-              if (Array.isArray(exercise.achieved[prop])) {
-                exercise.achieved[prop] = exercise.achieved[prop].map(() => "0");
-              }
-            }
-          });
-        });
-        break;
-      case "copyGoalOnly":
-        data.complete = false;
-        data.training.forEach((set) => {
-          set.forEach((exercise) => {
-            exercise.feedback = { difficulty: null, comments: [] };
-
-            for (const prop in exercise.achieved) {
-              if (Array.isArray(exercise.achieved[prop])) {
-                exercise.achieved[prop] = exercise.achieved[prop].map(() => "0");
-              }
-            }
-          });
-        });
-        break;
-      case "exact":
-        data.training.forEach((set) => {
-          set.forEach((exercise) => {
-            exercise.feedback = { difficulty: null, comments: [] };
-          });
-        });
-        break;
+const copy_workout_by_id = async (req, res, next) => {
+  try {
+    const { newDate, _id, option = "exact", newTitle, newAccount } = req.body;
+    if (!_id || !newDate) {
+      return res.status(400).json({ error: "Missing required fields." });
     }
-    data.training.forEach((set) => {
-      set.forEach((exercise) => {
-        exercise.exercise = exercise.exercise;
+
+    const data = await Training.findOne({ _id }).lean();
+    if (!data) return res.status(404).json({ error: "Training not found." });
+
+    if (String(data.user) !== String(res.locals.user._id)) {
+      const relationship = await Relationship.findOne({
+        trainer: res.locals.user._id,
+        client: data.user,
+        accepted: true,
       });
-    });
-
-
-    data._id = new mongoose.Types.ObjectId();
-    data.isNew = true;
-    data.date = newDate;
-    data.workoutFeedback = { difficulty: 1, comments: [] };
-    data
-      .save()
-      .then((workoutCopy) => {
-        res.send(workoutCopy);
-      })
-      .catch((err) => next(err));
-  };
-
-  Training.findOne({ _id })
-    .populate({
-      path: "training.exercise",
-      model: "Exercise",
-      select: "_id exerciseTitle",
-    })
-    .populate({
-      path: "user",
-      model: "User",
-      select: "_id firstName lastName profilePicture",
-    })
-    .then((data) => {
-      if (!data) return res.status(404).json({ error: "Training not found." });
-
-      if (data.user._id.toString() === res.locals.user._id) {
-        return modifyWorkout(data, newDate, _id, option, newTitle, newAccount);
+      if (!relationship) {
+        return res.status(403).json({ error: "Unauthorized access." });
       }
+    }
 
-      Relationship.findOne({ trainer: res.locals.user._id, client: data.user._id })
-        .then((relationship) => {
-          if (!relationship || !relationship.accepted) {
-            return res.status(403).json({ error: "Unauthorized access." });
-          }
-          modifyWorkout(data, newDate, _id, option, newTitle, newAccount);
-        })
-        .catch((err) => next(err));
-    })
-    .catch((err) => next(err));
+    const copyData = { ...data };
+    copyData._id = new mongoose.Types.ObjectId();
+    copyData.isNew = true;
+    copyData.date = dayjs.utc(newDate).startOf("day").toDate();
+    const nextUser = newAccount || copyData.user;
+    copyData.user =
+      mongoose.Types.ObjectId.isValid(nextUser) && !(nextUser instanceof mongoose.Types.ObjectId)
+        ? new mongoose.Types.ObjectId(nextUser)
+        : nextUser;
+    copyData.workoutFeedback = { difficulty: 1, comments: [] };
+    if (newTitle) copyData.title = newTitle;
+
+    if (Array.isArray(copyData.training)) {
+      switch (option) {
+        case "achievedToNewGoal":
+          copyData.complete = false;
+          copyData.training.forEach((set) => {
+            set.forEach((exercise) => {
+              exercise.goals.exactReps = exercise.achieved.reps;
+              exercise.goals.weight = exercise.achieved.weight;
+              exercise.goals.percent = exercise.achieved.percent;
+              exercise.goals.seconds = exercise.achieved.seconds;
+              exercise.feedback = { difficulty: null, comments: [] };
+
+              for (const prop in exercise.achieved) {
+                if (Array.isArray(exercise.achieved[prop])) {
+                  exercise.achieved[prop] = exercise.achieved[prop].map(() => "0");
+                }
+              }
+            });
+          });
+          break;
+        case "copyGoalOnly":
+          copyData.complete = false;
+          copyData.training.forEach((set) => {
+            set.forEach((exercise) => {
+              exercise.feedback = { difficulty: null, comments: [] };
+
+              for (const prop in exercise.achieved) {
+                if (Array.isArray(exercise.achieved[prop])) {
+                  exercise.achieved[prop] = exercise.achieved[prop].map(() => "0");
+                }
+              }
+            });
+          });
+          break;
+        case "exact":
+        default:
+          copyData.training.forEach((set) => {
+            set.forEach((exercise) => {
+              exercise.feedback = { difficulty: null, comments: [] };
+            });
+          });
+          break;
+      }
+    }
+
+    const insertResult = await Training.collection.insertOne(copyData, { ordered: false });
+    const insertedId = insertResult.insertedId;
+
+    const workoutCopy = await Training.findById(insertedId)
+      .populate({
+        path: "training.exercise",
+        model: "Exercise",
+        select: "_id exerciseTitle",
+      })
+      .populate({
+        path: "user",
+        model: "User",
+        select: "_id firstName lastName profilePicture",
+      });
+
+    return res.send(workoutCopy);
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const get_training_range_end = async (req, res, next) => {
@@ -736,8 +754,12 @@ const bulk_move_copy_workouts = async (req, res, next) => {
         copyData.isNew = true;
         copyData.date = targetQueue
           ? null
-          : dayjs.utc(workout.date).add(deltaDays, "day").toDate();
-        copyData.user = newAccount || copyData.user;
+          : dayjs.utc(workout.date).add(deltaDays, "day").startOf("day").toDate();
+        const nextUser = newAccount || copyData.user;
+        copyData.user =
+          mongoose.Types.ObjectId.isValid(nextUser) && !(nextUser instanceof mongoose.Types.ObjectId)
+            ? new mongoose.Types.ObjectId(nextUser)
+            : nextUser;
         copyData.workoutFeedback = { difficulty: 1, comments: [] };
         if (copyData.title) {
           copyData.title = `${titlePrefix}${copyData.title}${titleSuffix}`;
@@ -827,9 +849,20 @@ const get_workouts_by_range = async (req, res, next) => {
     const startDate = dayjs.utc(rangeStart).startOf("day").toDate();
     const endDate = dayjs.utc(rangeEnd).endOf("day").toDate();
 
+    const targetUserId = targetUser._id;
+    const targetUserObjectId = mongoose.Types.ObjectId.isValid(targetUserId)
+      ? new mongoose.Types.ObjectId(targetUserId)
+      : null;
+    const userMatch = targetUserObjectId ? { $in: [targetUserId, targetUserObjectId] } : targetUserId;
+
     const workoutQuery = {
-      user: targetUser,
-      date: { $gte: startDate, $lte: endDate },
+      user: userMatch,
+      $expr: {
+        $and: [
+          { $gte: [{ $toDate: "$date" }, startDate] },
+          { $lte: [{ $toDate: "$date" }, endDate] },
+        ],
+      },
     };
 
     if (filters?.categoriesInclude?.length || filters?.categoriesExclude?.length) {
@@ -918,6 +951,48 @@ const undo_bulk_move_copy = async (req, res, next) => {
     }
 
     return res.status(400).json({ error: "Invalid operation." });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const debug_training_by_ids = async (req, res, next) => {
+  try {
+    const { ids = [], userId, ignoreUser = false } = req.body;
+    if (!Array.isArray(ids) || !ids.length) {
+      return res.status(400).json({ error: "ids array is required." });
+    }
+
+    let targetUserId = res.locals.user._id;
+    if (userId && String(userId) !== String(res.locals.user._id)) {
+      const relationship = await Relationship.findOne({
+        trainer: res.locals.user._id,
+        client: userId,
+        accepted: true,
+      });
+      if (!relationship) {
+        return res.status(403).json({ error: "Unauthorized access." });
+      }
+      targetUserId = userId;
+    }
+
+    const targetUserObjectId = mongoose.Types.ObjectId.isValid(targetUserId)
+      ? new mongoose.Types.ObjectId(targetUserId)
+      : null;
+    const userMatch = targetUserObjectId ? { $in: [targetUserId, targetUserObjectId] } : targetUserId;
+
+    const query = {
+      _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) },
+    };
+    if (!ignoreUser) {
+      query.user = userMatch;
+    }
+
+    const trainings = await Training.find(query)
+      .select("_id date user title category")
+      .lean();
+
+    return res.send({ trainings, count: trainings.length });
   } catch (err) {
     return next(err);
   }
@@ -1188,4 +1263,5 @@ module.exports = {
   bulk_move_copy_workouts,
   get_workouts_by_range,
   undo_bulk_move_copy,
+  debug_training_by_ids,
 };

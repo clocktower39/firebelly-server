@@ -16,6 +16,7 @@ router.post('/workoutsRange', verifyAccessToken, trainingController.get_workouts
 router.post('/trainingRangeEnd', verifyAccessToken, trainingController.get_training_range_end);
 router.post('/bulkMoveCopyWorkouts', verifyAccessToken, trainingController.bulk_move_copy_workouts);
 router.post('/undoBulkMoveCopy', verifyAccessToken, trainingController.undo_bulk_move_copy);
+router.post('/debugTrainingByIds', verifyAccessToken, trainingController.debug_training_by_ids);
 router.post('/deleteWorkoutById', verifyAccessToken, trainingController.delete_workout_by_id);
 router.post('/getWorkoutHistory', verifyAccessToken, trainingController.workout_history_request);
 router.post('/workoutMonth', verifyAccessToken, trainingController.workout_month_request);
