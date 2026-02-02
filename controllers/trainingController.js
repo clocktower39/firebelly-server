@@ -524,7 +524,7 @@ const bulk_move_copy_workouts = async (req, res, next) => {
       userId,
       newAccount,
       targetQueue = false,
-      conflictPolicy = "abort",
+      conflictPolicy,
       filters = {},
       titlePrefix = "",
       titleSuffix = "",
@@ -610,6 +610,9 @@ const bulk_move_copy_workouts = async (req, res, next) => {
       return res.send({ workouts: [], user: targetUser ?? { _id: targetUserId } });
     }
 
+    const effectiveConflictPolicy =
+      action === "copy" ? "allow" : conflictPolicy || "abort";
+
     let workoutsToProcess = workoutsInRange;
     const targetUserForConflicts = action === "copy" ? newAccount || targetUserId : targetUserId;
     const movingIds = new Set(workoutsInRange.map((workout) => String(workout._id)));
@@ -643,14 +646,14 @@ const bulk_move_copy_workouts = async (req, res, next) => {
           ...new Set(conflicts.map((entry) => dayjs.utc(entry.date).format("YYYY-MM-DD"))),
         ];
 
-        if (conflictPolicy === "abort") {
+        if (effectiveConflictPolicy === "abort") {
           return res.status(409).json({
             error: `Conflicts found on target dates: ${conflictDates.join(", ")}`,
             conflicts: conflictDates,
           });
         }
 
-        if (conflictPolicy === "replace") {
+        if (effectiveConflictPolicy === "replace") {
           const deleteQuery = {
             user: targetUserForConflicts,
             $or: targetDateRanges,
@@ -662,7 +665,7 @@ const bulk_move_copy_workouts = async (req, res, next) => {
           await Training.deleteMany(deleteQuery);
         }
 
-        if (conflictPolicy === "skip") {
+        if (effectiveConflictPolicy === "skip") {
           const conflictDateSet = new Set(conflictDates);
           workoutsToProcess = workoutsInRange.filter((workout) => {
             const targetDate = dayjs.utc(workout.date).add(deltaDays, "day");
