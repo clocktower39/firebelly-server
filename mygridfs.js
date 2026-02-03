@@ -9,6 +9,12 @@ const uploadProfilePicture = multer({
     limits: { fileSize: 1000000 } // 1MB limit
 });
 
+const uploadGroupPicture = multer({
+    storage,
+    limits: { fileSize: 1000000 } // 1MB limit
+});
+
 module.exports = {
-    uploadProfilePicture
+    uploadProfilePicture,
+    uploadGroupPicture
 };

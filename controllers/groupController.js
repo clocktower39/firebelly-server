@@ -1,13 +1,16 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 
 const Group = require("../models/group");
 const GroupMembership = require("../models/groupMembership");
 const GroupProgramAssignment = require("../models/groupProgramAssignment");
+const GroupInvite = require("../models/groupInvite");
 const Program = require("../models/program");
 const Training = require("../models/training");
 const User = require("../models/user");
+const { sendEmail } = require("../services/emailService");
 
 dayjs.extend(utc);
 
@@ -25,6 +28,12 @@ const ADMIN_ROLES = new Set([ROLE.ADMIN]);
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const inviteBaseUrl =
+  process.env.APP_BASE_URL ||
+  process.env.CLIENT_URL ||
+  "http://localhost:3000";
+
+const buildInviteUrl = (token) => `${inviteBaseUrl.replace(/\/$/, "")}/groups/invite?token=${token}`;
 
 const requireMembership = async (groupId, userId) =>
   GroupMembership.findOne({ groupId, userId, status: ACTIVE_STATUS });
@@ -660,6 +669,537 @@ const assign_program_to_group = async (req, res, next) => {
   }
 };
 
+const upload_group_picture = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { groupId } = req.params;
+
+    if (!isValidObjectId(groupId)) {
+      return res.status(400).json({ error: "Invalid group ID." });
+    }
+
+    const membership = await requireMembership(groupId, userId);
+    if (!ensureRole(membership, ADMIN_ROLES)) {
+      return res.status(403).json({ error: "Admin access required." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded." });
+    }
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ error: "Group not found." });
+    }
+
+    const db = mongoose.connection.db;
+    const gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
+      bucketName: "groupPicture",
+    });
+
+    if (group.picture) {
+      const existingFile = await gridfsBucket
+        .find({ _id: new mongoose.Types.ObjectId(group.picture) })
+        .toArray();
+      if (existingFile.length > 0) {
+        await gridfsBucket.delete(new mongoose.Types.ObjectId(group.picture));
+      }
+    }
+
+    const filename = crypto.randomBytes(16).toString("hex");
+    const uploadStream = gridfsBucket.openUploadStream(filename, {
+      contentType: req.file.mimetype,
+    });
+    uploadStream.end(req.file.buffer);
+
+    uploadStream.on("finish", async () => {
+      group.picture = new mongoose.Types.ObjectId(uploadStream.id);
+      const saved = await group.save();
+      res.status(200).json(saved);
+    });
+
+    uploadStream.on("error", (err) => {
+      console.error("Error uploading group picture:", err);
+      res.status(500).send({ error: "Error uploading group picture", err });
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const get_group_picture = async (req, res, next) => {
+  try {
+    const db = mongoose.connection.db;
+    const gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
+      bucketName: "groupPicture",
+    });
+
+    const files = await gridfsBucket
+      .find({ _id: new mongoose.Types.ObjectId(req.params.id) })
+      .toArray();
+
+    if (!files || files.length === 0) {
+      return res.status(404).json({ error: "No group picture found" });
+    }
+
+    if (files[0].contentType === "image/jpeg" || files[0].contentType === "image/png") {
+      const readstream = gridfsBucket.openDownloadStream(files[0]._id);
+      return readstream.pipe(res);
+    }
+
+    return res.status(404).json({ error: "File is not an image" });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const delete_group_picture = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { groupId } = req.params;
+
+    if (!isValidObjectId(groupId)) {
+      return res.status(400).json({ error: "Invalid group ID." });
+    }
+
+    const membership = await requireMembership(groupId, userId);
+    if (!ensureRole(membership, ADMIN_ROLES)) {
+      return res.status(403).json({ error: "Admin access required." });
+    }
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ error: "Group not found." });
+    }
+
+    if (!group.picture) {
+      return res.status(200).json(group);
+    }
+
+    const db = mongoose.connection.db;
+    const gridfsBucket = new mongoose.mongo.GridFSBucket(db, {
+      bucketName: "groupPicture",
+    });
+
+    await gridfsBucket.delete(new mongoose.Types.ObjectId(group.picture));
+    group.picture = null;
+    const saved = await group.save();
+    return res.json(saved);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const create_invite = async (req, res, next) => {
+  try {
+    const adminId = res.locals.user._id;
+    const { groupId } = req.params;
+    const { email, role = ROLE.ATHLETE } = req.body;
+
+    if (!isValidObjectId(groupId)) {
+      return res.status(400).json({ error: "Invalid group ID." });
+    }
+
+    const membership = await requireMembership(groupId, adminId);
+    if (!ensureRole(membership, ADMIN_ROLES)) {
+      return res.status(403).json({ error: "Admin access required." });
+    }
+
+    if (!email || !String(email).includes("@")) {
+      return res.status(400).json({ error: "Valid email is required." });
+    }
+
+    if (!Object.values(ROLE).includes(role)) {
+      return res.status(400).json({ error: "Invalid role." });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const existingUser = await User.findOne({
+      email: new RegExp(`^${escapeRegex(normalizedEmail)}$`, "i"),
+    })
+      .select("_id email")
+      .lean();
+
+    if (existingUser) {
+      const existingMembership = await GroupMembership.findOne({
+        groupId,
+        userId: existingUser._id,
+        status: ACTIVE_STATUS,
+      });
+      if (existingMembership) {
+        return res.status(400).json({ error: "User is already in the group." });
+      }
+    }
+
+    const group = await Group.findById(groupId).select("name").lean();
+    if (!group) {
+      return res.status(404).json({ error: "Group not found." });
+    }
+
+    const expiresAt = dayjs().add(7, "day").toDate();
+    const token = crypto.randomBytes(32).toString("hex");
+
+    let invite = await GroupInvite.findOne({
+      groupId,
+      email: normalizedEmail,
+      status: "PENDING",
+    });
+
+    if (invite) {
+      invite.token = token;
+      invite.expiresAt = expiresAt;
+      invite.role = role;
+      invite.invitedBy = adminId;
+    } else {
+      invite = new GroupInvite({
+        groupId,
+        email: normalizedEmail,
+        role,
+        invitedBy: adminId,
+        token,
+        expiresAt,
+      });
+    }
+
+    await invite.save();
+
+    const inviter = await User.findById(adminId)
+      .select("firstName lastName")
+      .lean();
+
+    const inviteUrl = buildInviteUrl(invite.token);
+    const mailOptions = {
+      from: '"Firebelly Fitness" <info@firebellyfitness.com>',
+      to: normalizedEmail,
+      subject: `You're invited to join ${group.name}`,
+      html: `
+        <p>Hi there,</p>
+        <p>${inviter?.firstName || "A coach"} invited you to join <strong>${group.name}</strong> on Firebelly Fitness.</p>
+        <p>Your role: <strong>${role}</strong></p>
+        <p>Click the link below to accept the invite:</p>
+        <a href="${inviteUrl}">Accept Invite</a>
+        <p>This invite will expire in 7 days.</p>
+      `,
+    };
+
+    await sendEmail(mailOptions);
+
+    return res.json({ status: "sent", invite });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const list_invites = async (req, res, next) => {
+  try {
+    const adminId = res.locals.user._id;
+    const { groupId } = req.params;
+
+    if (!isValidObjectId(groupId)) {
+      return res.status(400).json({ error: "Invalid group ID." });
+    }
+
+    const membership = await requireMembership(groupId, adminId);
+    if (!ensureRole(membership, ADMIN_ROLES)) {
+      return res.status(403).json({ error: "Admin access required." });
+    }
+
+    const invites = await GroupInvite.find({ groupId, status: "PENDING" })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json(invites);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const revoke_invite = async (req, res, next) => {
+  try {
+    const adminId = res.locals.user._id;
+    const { groupId, inviteId } = req.params;
+
+    if (!isValidObjectId(groupId) || !isValidObjectId(inviteId)) {
+      return res.status(400).json({ error: "Invalid group or invite ID." });
+    }
+
+    const membership = await requireMembership(groupId, adminId);
+    if (!ensureRole(membership, ADMIN_ROLES)) {
+      return res.status(403).json({ error: "Admin access required." });
+    }
+
+    const invite = await GroupInvite.findOne({
+      _id: inviteId,
+      groupId,
+      status: "PENDING",
+    });
+
+    if (!invite) {
+      return res.status(404).json({ error: "Invite not found." });
+    }
+
+    invite.status = "REVOKED";
+    await invite.save();
+
+    return res.json({ status: "revoked" });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const get_invite_by_token = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      return res.status(400).json({ error: "Invite token required." });
+    }
+
+    const invite = await GroupInvite.findOne({ token }).lean();
+    if (!invite) {
+      return res.status(404).json({ error: "Invite not found." });
+    }
+
+    if (invite.status === "PENDING" && invite.expiresAt < new Date()) {
+      await GroupInvite.updateOne({ _id: invite._id }, { status: "EXPIRED" });
+      return res.status(400).json({ error: "Invite expired." });
+    }
+
+    const group = await Group.findById(invite.groupId).select("name").lean();
+
+    return res.json({
+      invite: {
+        email: invite.email,
+        role: invite.role,
+        status: invite.status,
+        expiresAt: invite.expiresAt,
+        groupId: invite.groupId,
+      },
+      group: group || null,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const accept_invite = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: "Invite token required." });
+    }
+
+    const invite = await GroupInvite.findOne({ token });
+    if (!invite) {
+      return res.status(404).json({ error: "Invite not found." });
+    }
+
+    if (invite.status !== "PENDING") {
+      return res.status(400).json({ error: `Invite is ${invite.status.toLowerCase()}.` });
+    }
+
+    if (invite.expiresAt < new Date()) {
+      invite.status = "EXPIRED";
+      await invite.save();
+      return res.status(400).json({ error: "Invite expired." });
+    }
+
+    const user = await User.findById(userId).select("email").lean();
+    if (!user || user.email.toLowerCase() !== invite.email.toLowerCase()) {
+      return res.status(403).json({ error: "Invite email does not match your account." });
+    }
+
+    let membership = await GroupMembership.findOne({ groupId: invite.groupId, userId });
+    if (membership) {
+      membership.role = invite.role;
+      membership.status = ACTIVE_STATUS;
+      membership.joinedAt = membership.joinedAt || new Date();
+      await membership.save();
+    } else {
+      membership = new GroupMembership({
+        groupId: invite.groupId,
+        userId,
+        role: invite.role,
+        status: ACTIVE_STATUS,
+        addedBy: invite.invitedBy,
+        joinedAt: new Date(),
+      });
+      await membership.save();
+    }
+
+    if (membership.role === ROLE.ATHLETE) {
+      await applyAssignmentsForMember({
+        groupId: invite.groupId,
+        userId,
+        addedBy: invite.invitedBy,
+      });
+    }
+
+    invite.status = "ACCEPTED";
+    invite.acceptedAt = new Date();
+    invite.acceptedBy = userId;
+    await invite.save();
+
+    return res.json({ status: "accepted", groupId: invite.groupId });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const get_group_analytics = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { groupId } = req.params;
+    const { startDate, endDate } = req.query;
+
+    if (!isValidObjectId(groupId)) {
+      return res.status(400).json({ error: "Invalid group ID." });
+    }
+
+    const membership = await requireMembership(groupId, userId);
+    if (!membership) {
+      return res.status(403).json({ error: "Unauthorized access." });
+    }
+
+    const match = { groupId: new mongoose.Types.ObjectId(groupId) };
+    if (startDate || endDate) {
+      const dateFilter = {};
+      if (startDate) {
+        const parsedStart = dayjs(startDate);
+        if (!parsedStart.isValid()) {
+          return res.status(400).json({ error: "Invalid start date." });
+        }
+        dateFilter.$gte = parsedStart.startOf("day").toDate();
+      }
+      if (endDate) {
+        const parsedEnd = dayjs(endDate);
+        if (!parsedEnd.isValid()) {
+          return res.status(400).json({ error: "Invalid end date." });
+        }
+        dateFilter.$lte = parsedEnd.endOf("day").toDate();
+      }
+      match.date = dateFilter;
+    }
+
+    const summaryAgg = await Training.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: null,
+          totalAssigned: { $sum: 1 },
+          completed: {
+            $sum: { $cond: [{ $eq: ["$complete", true] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+
+    const summary = summaryAgg[0] || { totalAssigned: 0, completed: 0 };
+    const completionRate = summary.totalAssigned
+      ? summary.completed / summary.totalAssigned
+      : 0;
+
+    const byMemberAgg = await Training.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: "$user",
+          totalAssigned: { $sum: 1 },
+          completed: {
+            $sum: { $cond: [{ $eq: ["$complete", true] }, 1, 0] },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      { $unwind: "$user" },
+      {
+        $project: {
+          _id: 0,
+          userId: "$user._id",
+          firstName: "$user.firstName",
+          lastName: "$user.lastName",
+          totalAssigned: 1,
+          completed: 1,
+        },
+      },
+      { $sort: { completed: -1 } },
+    ]);
+
+    const byMember = byMemberAgg.map((entry) => ({
+      ...entry,
+      completionRate: entry.totalAssigned ? entry.completed / entry.totalAssigned : 0,
+    }));
+
+    return res.json({
+      summary: {
+        ...summary,
+        completionRate,
+      },
+      byMember,
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const update_group_billing = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { groupId } = req.params;
+
+    if (!isValidObjectId(groupId)) {
+      return res.status(400).json({ error: "Invalid group ID." });
+    }
+
+    const membership = await requireMembership(groupId, userId);
+    if (!ensureRole(membership, ADMIN_ROLES)) {
+      return res.status(403).json({ error: "Admin access required." });
+    }
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ error: "Group not found." });
+    }
+
+    const { status, planId, trialEndsAt, customerId, subscriptionId } = req.body;
+    const allowedStatuses = ["INACTIVE", "TRIALING", "ACTIVE", "PAST_DUE", "CANCELLED"];
+
+    if (status && !allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: "Invalid billing status." });
+    }
+
+    if (status !== undefined) group.billing.status = status;
+    if (planId !== undefined) group.billing.planId = planId || null;
+    if (customerId !== undefined) group.billing.customerId = customerId || null;
+    if (subscriptionId !== undefined) group.billing.subscriptionId = subscriptionId || null;
+
+    if (trialEndsAt !== undefined) {
+      if (!trialEndsAt) {
+        group.billing.trialEndsAt = null;
+      } else {
+        const parsed = dayjs(trialEndsAt);
+        if (!parsed.isValid()) {
+          return res.status(400).json({ error: "Invalid trial end date." });
+        }
+        group.billing.trialEndsAt = parsed.toDate();
+      }
+    }
+
+    const saved = await group.save();
+    return res.json(saved);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   create_group,
   list_groups,
@@ -672,4 +1212,14 @@ module.exports = {
   list_group_assignments,
   assign_program_to_group,
   search_group_users,
+  upload_group_picture,
+  get_group_picture,
+  delete_group_picture,
+  create_invite,
+  list_invites,
+  revoke_invite,
+  get_invite_by_token,
+  accept_invite,
+  get_group_analytics,
+  update_group_billing,
 };

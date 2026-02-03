@@ -24,6 +24,7 @@ const groupSchema = new mongoose.Schema(
     timezone: { type: String, default: "UTC" },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     archivedAt: { type: Date, default: null },
+    picture: { type: mongoose.Schema.Types.ObjectId, ref: "groupPicture.files", default: null },
     billing: { type: billingSchema, default: () => ({}) },
   },
   { timestamps: true, minimize: false }
