@@ -40,5 +40,12 @@ router.post("/groups/invitations/accept", verifyAccessToken, groupController.acc
 
 router.get("/groups/:groupId/analytics", verifyAccessToken, groupController.get_group_analytics);
 router.put("/groups/:groupId/billing", verifyAccessToken, groupController.update_group_billing);
+router.get("/groups/:groupId/chat", verifyAccessToken, groupController.get_group_chat);
+router.post("/groups/:groupId/chat/messages", verifyAccessToken, groupController.send_group_message);
+router.delete(
+  "/groups/:groupId/chat/messages/:messageId",
+  verifyAccessToken,
+  groupController.delete_group_message
+);
 
 module.exports = router;
