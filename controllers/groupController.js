@@ -9,6 +9,7 @@ const GroupProgramAssignment = require("../models/groupProgramAssignment");
 const GroupInvite = require("../models/groupInvite");
 const Program = require("../models/program");
 const Training = require("../models/training");
+const Conversation = require("../models/conversation");
 const User = require("../models/user");
 const { sendEmail } = require("../services/emailService");
 
@@ -1226,6 +1227,123 @@ const update_group_billing = async (req, res, next) => {
   }
 };
 
+const get_group_chat = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { groupId } = req.params;
+
+    if (!isValidObjectId(groupId)) {
+      return res.status(400).json({ error: "Invalid group ID." });
+    }
+
+    const membership = await requireMembership(groupId, userId);
+    if (!membership) {
+      return res.status(403).json({ error: "Unauthorized access." });
+    }
+
+    let conversation = await Conversation.findOne({ groupId })
+      .populate("messages.user", "firstName lastName profilePicture")
+      .lean();
+
+    if (!conversation) {
+      const created = await Conversation.create({
+        groupId,
+        messages: [],
+        users: [],
+      });
+      conversation = await Conversation.findById(created._id)
+        .populate("messages.user", "firstName lastName profilePicture")
+        .lean();
+    }
+
+    return res.json(conversation);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const send_group_message = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { groupId } = req.params;
+    const { message } = req.body;
+
+    if (!isValidObjectId(groupId)) {
+      return res.status(400).json({ error: "Invalid group ID." });
+    }
+
+    if (!message || !String(message).trim()) {
+      return res.status(400).json({ error: "Message is required." });
+    }
+
+    const membership = await requireMembership(groupId, userId);
+    if (!membership) {
+      return res.status(403).json({ error: "Unauthorized access." });
+    }
+
+    const newMessage = {
+      user: userId,
+      message: String(message).trim(),
+      timestamp: new Date(),
+    };
+
+    let conversation = await Conversation.findOneAndUpdate(
+      { groupId },
+      { $push: { messages: newMessage } },
+      { new: true }
+    )
+      .populate("messages.user", "firstName lastName profilePicture")
+      .lean();
+
+    if (!conversation) {
+      const created = await Conversation.create({
+        groupId,
+        messages: [newMessage],
+        users: [],
+      });
+      conversation = await Conversation.findById(created._id)
+        .populate("messages.user", "firstName lastName profilePicture")
+        .lean();
+    }
+
+    return res.json(conversation);
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const delete_group_message = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const { groupId, messageId } = req.params;
+
+    if (!isValidObjectId(groupId) || !isValidObjectId(messageId)) {
+      return res.status(400).json({ error: "Invalid group or message ID." });
+    }
+
+    const membership = await requireMembership(groupId, userId);
+    if (!membership) {
+      return res.status(403).json({ error: "Unauthorized access." });
+    }
+
+    const conversation = await Conversation.findOneAndUpdate(
+      { groupId },
+      { $pull: { messages: { _id: messageId, user: userId } } },
+      { new: true }
+    )
+      .populate("messages.user", "firstName lastName profilePicture")
+      .lean();
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found." });
+    }
+
+    return res.json(conversation);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 module.exports = {
   create_group,
   list_groups,
@@ -1248,4 +1366,7 @@ module.exports = {
   accept_invite,
   get_group_analytics,
   update_group_billing,
+  get_group_chat,
+  send_group_message,
+  delete_group_message,
 };
