@@ -6,7 +6,7 @@ const groupMembershipSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     role: {
       type: String,
-      enum: ["ADMIN", "TRAINER", "COACH", "ATHLETE"],
+      enum: ["TRAINER", "COACH", "ATHLETE", "ADMIN"],
       required: true,
     },
     status: {
