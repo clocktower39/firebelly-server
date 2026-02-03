@@ -6,7 +6,7 @@ const groupInviteSchema = new mongoose.Schema(
     email: { type: String, required: true, lowercase: true, trim: true },
     role: {
       type: String,
-      enum: ["ADMIN", "TRAINER", "COACH", "ATHLETE"],
+      enum: ["TRAINER", "COACH", "ATHLETE", "ADMIN"],
       default: "ATHLETE",
     },
     invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },

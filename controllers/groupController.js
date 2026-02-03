@@ -15,16 +15,16 @@ const { sendEmail } = require("../services/emailService");
 dayjs.extend(utc);
 
 const ROLE = {
-  ADMIN: "ADMIN",
   TRAINER: "TRAINER",
   COACH: "COACH",
   ATHLETE: "ATHLETE",
+  LEGACY_ADMIN: "ADMIN",
 };
 
 const ACTIVE_STATUS = "ACTIVE";
 
-const ASSIGN_ROLES = new Set([ROLE.ADMIN, ROLE.TRAINER, ROLE.COACH]);
-const ADMIN_ROLES = new Set([ROLE.ADMIN]);
+const ASSIGN_ROLES = new Set([ROLE.TRAINER, ROLE.COACH, ROLE.LEGACY_ADMIN]);
+const TRAINER_ROLES = new Set([ROLE.TRAINER, ROLE.LEGACY_ADMIN]);
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -35,11 +35,16 @@ const inviteBaseUrl =
 
 const buildInviteUrl = (token) => `${inviteBaseUrl.replace(/\/$/, "")}/groups/invite?token=${token}`;
 
+const normalizeRole = (role) => (role === ROLE.LEGACY_ADMIN ? ROLE.TRAINER : role);
+
 const requireMembership = async (groupId, userId) =>
   GroupMembership.findOne({ groupId, userId, status: ACTIVE_STATUS });
 
-const ensureRole = (membership, allowedRoles) =>
-  membership && allowedRoles.has(membership.role);
+const ensureRole = (membership, allowedRoles) => {
+  if (!membership) return false;
+  const effectiveRole = normalizeRole(membership.role);
+  return allowedRoles.has(effectiveRole);
+};
 
 const resolveDayMap = (dayMap, daysPerWeek) => {
   if (!Array.isArray(dayMap) || dayMap.length === 0) {
@@ -145,7 +150,7 @@ const create_group = async (req, res, next) => {
     const membership = new GroupMembership({
       groupId: savedGroup._id,
       userId,
-      role: ROLE.ADMIN,
+      role: ROLE.TRAINER,
       status: ACTIVE_STATUS,
       addedBy: userId,
       joinedAt: new Date(),
@@ -172,7 +177,7 @@ const list_groups = async (req, res, next) => {
       .filter((membership) => membership.groupId)
       .map((membership) => ({
         group: membership.groupId,
-        role: membership.role,
+        role: normalizeRole(membership.role),
         membershipId: membership._id,
         membershipStatus: membership.status,
       }));
@@ -202,7 +207,11 @@ const get_group = async (req, res, next) => {
       return res.status(404).json({ error: "Group not found." });
     }
 
-    return res.json({ group, role: membership.role, membershipId: membership._id });
+    return res.json({
+      group,
+      role: normalizeRole(membership.role),
+      membershipId: membership._id,
+    });
   } catch (err) {
     return next(err);
   }
@@ -218,8 +227,8 @@ const update_group = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, userId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     const group = await Group.findById(groupId);
@@ -273,7 +282,12 @@ const list_members = async (req, res, next) => {
       .sort({ createdAt: 1 })
       .lean();
 
-    return res.json(members);
+    const normalized = members.map((member) => ({
+      ...member,
+      role: normalizeRole(member.role),
+    }));
+
+    return res.json(normalized);
   } catch (err) {
     return next(err);
   }
@@ -333,8 +347,8 @@ const add_member = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, adminId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     const { userId, email, role = ROLE.ATHLETE } = req.body;
@@ -358,6 +372,7 @@ const add_member = async (req, res, next) => {
     if (!Object.values(ROLE).includes(role)) {
       return res.status(400).json({ error: "Invalid role." });
     }
+    const resolvedRole = normalizeRole(role);
 
     const user = await User.findById(resolvedUserId).select("_id").lean();
     if (!user) {
@@ -369,7 +384,7 @@ const add_member = async (req, res, next) => {
 
     let saved;
     if (existing) {
-      existing.role = role;
+      existing.role = resolvedRole;
       existing.status = ACTIVE_STATUS;
       existing.addedBy = adminId;
       existing.joinedAt = existing.joinedAt || new Date();
@@ -378,16 +393,16 @@ const add_member = async (req, res, next) => {
       const created = new GroupMembership({
         groupId,
       userId: resolvedUserId,
-      role,
+      role: resolvedRole,
       status: ACTIVE_STATUS,
       addedBy: adminId,
       joinedAt: new Date(),
-      });
-      saved = await created.save();
-    }
+    });
+    saved = await created.save();
+  }
 
     let autoAssignedCount = 0;
-    if (!wasActive && role === ROLE.ATHLETE) {
+    if (!wasActive && resolvedRole === ROLE.ATHLETE) {
       autoAssignedCount = await applyAssignmentsForMember({
         groupId,
         userId: resolvedUserId,
@@ -412,8 +427,8 @@ const search_group_users = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, adminId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     if (!query || String(query).trim().length < 2) {
@@ -455,8 +470,8 @@ const update_member = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, adminId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     const member = await GroupMembership.findOne({ _id: memberId, groupId });
@@ -475,13 +490,14 @@ const update_member = async (req, res, next) => {
     }
 
     const wasActive = member.status === ACTIVE_STATUS;
-    member.role = role;
+    const resolvedRole = normalizeRole(role);
+    member.role = resolvedRole;
     member.status = status;
 
     const saved = await member.save();
 
     let autoAssignedCount = 0;
-    if (!wasActive && status === ACTIVE_STATUS && role === ROLE.ATHLETE) {
+    if (!wasActive && status === ACTIVE_STATUS && resolvedRole === ROLE.ATHLETE) {
       autoAssignedCount = await applyAssignmentsForMember({
         groupId,
         userId: member.userId,
@@ -505,8 +521,8 @@ const remove_member = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, adminId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     const member = await GroupMembership.findOne({ _id: memberId, groupId });
@@ -602,9 +618,12 @@ const assign_program_to_group = async (req, res, next) => {
       status: ACTIVE_STATUS,
     }).lean();
 
-    if (!programOwnerMembership || programOwnerMembership.role === ROLE.ATHLETE) {
+    if (
+      !programOwnerMembership ||
+      normalizeRole(programOwnerMembership.role) === ROLE.ATHLETE
+    ) {
       return res.status(400).json({
-        error: "Program owner must be a trainer, coach, or admin in this group.",
+        error: "Program owner must be a trainer or coach in this group.",
       });
     }
 
@@ -679,8 +698,8 @@ const upload_group_picture = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, userId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     if (!req.file) {
@@ -763,8 +782,8 @@ const delete_group_picture = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, userId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     const group = await Group.findById(groupId);
@@ -801,8 +820,8 @@ const create_invite = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, adminId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     if (!email || !String(email).includes("@")) {
@@ -848,13 +867,13 @@ const create_invite = async (req, res, next) => {
     if (invite) {
       invite.token = token;
       invite.expiresAt = expiresAt;
-      invite.role = role;
+      invite.role = resolvedRole;
       invite.invitedBy = adminId;
     } else {
       invite = new GroupInvite({
         groupId,
         email: normalizedEmail,
-        role,
+        role: resolvedRole,
         invitedBy: adminId,
         token,
         expiresAt,
@@ -875,7 +894,7 @@ const create_invite = async (req, res, next) => {
       html: `
         <p>Hi there,</p>
         <p>${inviter?.firstName || "A coach"} invited you to join <strong>${group.name}</strong> on Firebelly Fitness.</p>
-        <p>Your role: <strong>${role}</strong></p>
+        <p>Your role: <strong>${resolvedRole}</strong></p>
         <p>Click the link below to accept the invite:</p>
         <a href="${inviteUrl}">Accept Invite</a>
         <p>This invite will expire in 7 days.</p>
@@ -900,15 +919,20 @@ const list_invites = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, adminId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     const invites = await GroupInvite.find({ groupId, status: "PENDING" })
       .sort({ createdAt: -1 })
       .lean();
 
-    return res.json(invites);
+    const normalized = invites.map((invite) => ({
+      ...invite,
+      role: normalizeRole(invite.role),
+    }));
+
+    return res.json(normalized);
   } catch (err) {
     return next(err);
   }
@@ -924,8 +948,8 @@ const revoke_invite = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, adminId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     const invite = await GroupInvite.findOne({
@@ -969,7 +993,7 @@ const get_invite_by_token = async (req, res, next) => {
     return res.json({
       invite: {
         email: invite.email,
-        role: invite.role,
+        role: normalizeRole(invite.role),
         status: invite.status,
         expiresAt: invite.expiresAt,
         groupId: invite.groupId,
@@ -1010,9 +1034,10 @@ const accept_invite = async (req, res, next) => {
       return res.status(403).json({ error: "Invite email does not match your account." });
     }
 
+    const resolvedRole = normalizeRole(invite.role);
     let membership = await GroupMembership.findOne({ groupId: invite.groupId, userId });
     if (membership) {
-      membership.role = invite.role;
+      membership.role = resolvedRole;
       membership.status = ACTIVE_STATUS;
       membership.joinedAt = membership.joinedAt || new Date();
       await membership.save();
@@ -1020,7 +1045,7 @@ const accept_invite = async (req, res, next) => {
       membership = new GroupMembership({
         groupId: invite.groupId,
         userId,
-        role: invite.role,
+        role: resolvedRole,
         status: ACTIVE_STATUS,
         addedBy: invite.invitedBy,
         joinedAt: new Date(),
@@ -1036,6 +1061,7 @@ const accept_invite = async (req, res, next) => {
       });
     }
 
+    invite.role = resolvedRole;
     invite.status = "ACCEPTED";
     invite.acceptedAt = new Date();
     invite.acceptedBy = userId;
@@ -1160,8 +1186,8 @@ const update_group_billing = async (req, res, next) => {
     }
 
     const membership = await requireMembership(groupId, userId);
-    if (!ensureRole(membership, ADMIN_ROLES)) {
-      return res.status(403).json({ error: "Admin access required." });
+    if (!ensureRole(membership, TRAINER_ROLES)) {
+      return res.status(403).json({ error: "Trainer access required." });
     }
 
     const group = await Group.findById(groupId);
