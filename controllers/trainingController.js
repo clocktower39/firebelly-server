@@ -381,12 +381,16 @@ const update_workout_date_by_id = async (req, res, next) => {
 const copy_workout_by_id = async (req, res, next) => {
   try {
     const { newDate, _id, option = "exact", newTitle, newAccount } = req.body;
-    if (!_id || !newDate) {
+    if (!_id) {
       return res.status(400).json({ error: "Missing required fields." });
     }
 
     const data = await Training.findOne({ _id }).lean();
     if (!data) return res.status(404).json({ error: "Training not found." });
+    const hasNewDate = newDate !== undefined && newDate !== null && newDate !== "";
+    if (!hasNewDate && !data.isTemplate) {
+      return res.status(400).json({ error: "Missing required fields." });
+    }
 
     if (String(data.user) !== String(res.locals.user._id)) {
       const relationship = await Relationship.findOne({
@@ -402,7 +406,9 @@ const copy_workout_by_id = async (req, res, next) => {
     const copyData = { ...data };
     copyData._id = new mongoose.Types.ObjectId();
     copyData.isNew = true;
-    copyData.date = dayjs.utc(newDate).startOf("day").toDate();
+    if (hasNewDate) {
+      copyData.date = dayjs.utc(newDate).startOf("day").toDate();
+    }
     const nextUser = newAccount || copyData.user;
     copyData.user =
       mongoose.Types.ObjectId.isValid(nextUser) && !(nextUser instanceof mongoose.Types.ObjectId)
