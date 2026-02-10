@@ -9,6 +9,7 @@ const UserSchema = new mongoose.Schema({
     usernameLower: { type: String, index: { unique: true, sparse: true } },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
+    isTrainer: { type: Boolean, default: false },
     password: { type: String, required: true },
     phoneNumber: { type: String },
     dateOfBirth: { type: Date },
