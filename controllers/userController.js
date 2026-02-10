@@ -2,29 +2,41 @@ const User = require("../models/user");
 const Relationship = require("../models/relationship");
 const ScheduleEvent = require("../models/scheduleEvent");
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
 const crypto = require('crypto');
 const path = require('path');
 const { verifyRefreshToken } = require("../middleware/auth");
-const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 const { sendEmail } = require("../services/emailService")
-
-const createTokens = (user) => {
-  const accessToken = jwt.sign(user._doc, ACCESS_TOKEN_SECRET, {
-    expiresIn: "180m", // Set a shorter expiration for access tokens
-  });
-
-  const refreshToken = jwt.sign(user._doc, REFRESH_TOKEN_SECRET, {
-    expiresIn: "90d", // Set a longer expiration for refresh tokens
-  });
-
-  return { accessToken, refreshToken };
-};
+const { createTokens } = require("../services/tokenService");
+const { getAgeBand } = require("../utils/age");
 
 const signup_user = async (req, res, next) => {
   try {
-    const user = new User(req.body);
+    const { firstName, lastName, email, password, dateOfBirth } = req.body;
+    const ageBand = getAgeBand(dateOfBirth);
+
+    if (ageBand === "u13") {
+      return res.status(400).json({
+        error: {
+          dateOfBirth:
+            "Users under 13 must have a parent or guardian create their account.",
+        },
+      });
+    }
+
+    const accountType =
+      ageBand && ageBand !== "18_plus" ? "teen" : "adult";
+
+    const user = new User({
+      firstName,
+      lastName,
+      email,
+      password,
+      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+      accountType,
+      ageBand: ageBand || "18_plus",
+      saleShareOptIn: false,
+      adPersonalizationAllowed: false,
+    });
 
     // Generate a verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -189,6 +201,47 @@ const login_user = (req, res, next) => {
       }
     })
     .catch((err) => next(err));
+};
+
+const login_child = async (req, res, next) => {
+  try {
+    const username = String(req.body.username || "").trim();
+    const pin = req.body.pin;
+
+    if (!username || !pin) {
+      return res.status(400).json({ error: { username: "Username and PIN are required." } });
+    }
+
+    const user = await User.findOne({ usernameLower: username.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ error: { username: "Username not found." } });
+    }
+
+    if (!["child", "teen"].includes(user.accountType)) {
+      return res.status(400).json({ error: { username: "Account type not eligible for child login." } });
+    }
+
+    if (user.ageBand === "u13" && user.coppaStatus !== "consented") {
+      return res.status(403).json({
+        error: {
+          consent: "Parental consent is required before this account can be used.",
+        },
+      });
+    }
+
+    const isMatch = await user.comparePassword(pin);
+    if (!isMatch) {
+      return res.status(400).json({ error: { pin: "Incorrect PIN." } });
+    }
+
+    const tokens = createTokens(user);
+    res.send({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 const refresh_tokens = (req, res, next) => {
@@ -457,6 +510,7 @@ module.exports = {
   verify_email,
   resend_verification_email,
   login_user,
+  login_child,
   update_user,
   checkAuthLoginToken,
   get_userInfo,

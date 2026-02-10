@@ -1,6 +1,7 @@
 const express = require('express');
 const relationshipController = require('../controllers/relationshipController');
 const { verifyAccessToken, verifyRefreshToken } = require("../middleware/auth");
+const { ensureWriteAccess } = require("../middleware/ensureWriteAccess");
 const { validate, Joi } = require('express-validation');
 
 const relationshipValidate = {
@@ -34,9 +35,9 @@ const router = express.Router();
 router.get('/relationships/:type/:_id', verifyAccessToken, relationshipController.get_relationships);
 router.get('/relationships/myTrainers', verifyAccessToken, relationshipController.get_my_relationships);
 router.get('/relationships/myClients', verifyAccessToken, relationshipController.get_my_clients);
-router.post('/changeRelationshipStatus', validate(relationshipStatus, {}, {}), verifyAccessToken, relationshipController.change_relationship_status);
-router.post('/manageRelationship', validate(relationshipValidate, {}, {}), verifyAccessToken, relationshipController.manage_relationship);
-router.post('/removeRelationship', verifyAccessToken, relationshipController.remove_relationship);
-router.post('/relationships/metricsApproval', validate(metricsApprovalStatus, {}, {}), verifyAccessToken, relationshipController.update_metrics_approval);
+router.post('/changeRelationshipStatus', validate(relationshipStatus, {}, {}), verifyAccessToken, ensureWriteAccess, relationshipController.change_relationship_status);
+router.post('/manageRelationship', validate(relationshipValidate, {}, {}), verifyAccessToken, ensureWriteAccess, relationshipController.manage_relationship);
+router.post('/removeRelationship', verifyAccessToken, ensureWriteAccess, relationshipController.remove_relationship);
+router.post('/relationships/metricsApproval', validate(metricsApprovalStatus, {}, {}), verifyAccessToken, ensureWriteAccess, relationshipController.update_metrics_approval);
 
 module.exports = router;
