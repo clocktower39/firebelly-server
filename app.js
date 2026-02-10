@@ -19,6 +19,7 @@ const programRoutes = require("./routes/programRoutes");
 const groupRoutes = require("./routes/groupRoutes");
 const trainerConnectionRoutes = require("./routes/trainerConnectionRoutes");
 const metricRoutes = require("./routes/metricRoutes");
+const guardianRoutes = require("./routes/guardianRoutes");
 const methodOverride = require("method-override");
 global.io = require("./io").initialize(http, {
   cors: {
@@ -62,6 +63,7 @@ app.use("/", programRoutes);
 app.use("/", groupRoutes);
 app.use("/", trainerConnectionRoutes);
 app.use("/", metricRoutes);
+app.use("/", guardianRoutes);
 
 const connectedClients = {};
 

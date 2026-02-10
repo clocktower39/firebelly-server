@@ -4,12 +4,43 @@ require('dotenv').config();
 const SALT_WORK_FACTOR = Number(process.env.SALT_WORK_FACTOR);
 
 const UserSchema = new mongoose.Schema({
-    email: { type: String, required: true, index: { unique: true } },
+    email: { type: String, index: { unique: true, sparse: true } },
+    username: { type: String, index: { unique: true, sparse: true } },
+    usernameLower: { type: String, index: { unique: true, sparse: true } },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
+    isTrainer: { type: Boolean, default: false },
     password: { type: String, required: true },
     phoneNumber: { type: String },
     dateOfBirth: { type: Date },
+    accountType: {
+        type: String,
+        enum: ["adult", "guardian", "teen", "child"],
+        default: "adult",
+    },
+    ageBand: {
+        type: String,
+        enum: ["u13", "13_15", "16_17", "18_plus"],
+        default: null,
+    },
+    coppaStatus: {
+        type: String,
+        enum: ["needs_consent", "consented", "denied"],
+        default: null,
+    },
+    consentScope: {
+        type: String,
+        enum: ["collection_only", "collection_and_disclosure"],
+        default: null,
+    },
+    saleShareOptIn: { type: Boolean, default: false },
+    adPersonalizationAllowed: { type: Boolean, default: false },
+    coppaConsent: {
+        method: { type: String },
+        scope: { type: String },
+        consentedAt: { type: Date },
+        guardianId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    },
     height: { type: String },
     sex: { type: String, },
     gymBarcode: { type: String, },
@@ -47,6 +78,10 @@ const UserSchema = new mongoose.Schema({
 
 UserSchema.pre('save', function(next) {
     let user = this;
+
+    if (user.username) {
+        user.usernameLower = user.username.toLowerCase();
+    }
 
     // only hash the password if it has been modified (or is new)
     if (!user.isModified('password')) return next();
