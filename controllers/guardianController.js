@@ -8,7 +8,7 @@ const { getAgeBand } = require("../utils/age");
 const ensureGuardianAccount = async (guardianId) => {
   await User.findByIdAndUpdate(
     guardianId,
-    { accountType: "guardian", ageBand: "18_plus" },
+    { $set: { accountType: "guardian", ageBand: "18_plus" } },
     { new: true }
   );
 };
