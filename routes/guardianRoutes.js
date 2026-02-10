@@ -2,6 +2,7 @@ const express = require("express");
 const guardianController = require("../controllers/guardianController");
 const { verifyAccessToken } = require("../middleware/auth");
 const { ensureWriteAccess } = require("../middleware/ensureWriteAccess");
+const { ensureGuardianAccess } = require("../middleware/ensureGuardianAccess");
 const { validate, Joi } = require("express-validation");
 
 const createChildValidate = {
@@ -42,14 +43,21 @@ router.post(
   "/guardian/child",
   validate(createChildValidate, {}, {}),
   verifyAccessToken,
+  ensureGuardianAccess,
   ensureWriteAccess,
   guardianController.create_child
 );
-router.get("/guardian/children", verifyAccessToken, guardianController.list_children);
+router.get(
+  "/guardian/children",
+  verifyAccessToken,
+  ensureGuardianAccess,
+  guardianController.list_children
+);
 router.post(
   "/guardian/child/token",
   validate(childTokenValidate, {}, {}),
   verifyAccessToken,
+  ensureGuardianAccess,
   ensureWriteAccess,
   guardianController.issue_child_view_token
 );
@@ -57,6 +65,7 @@ router.post(
   "/guardian/child/consent",
   validate(consentValidate, {}, {}),
   verifyAccessToken,
+  ensureGuardianAccess,
   ensureWriteAccess,
   guardianController.record_consent
 );
@@ -64,6 +73,7 @@ router.post(
   "/guardian/child/add-email",
   validate(addEmailValidate, {}, {}),
   verifyAccessToken,
+  ensureGuardianAccess,
   ensureWriteAccess,
   guardianController.add_child_email
 );
