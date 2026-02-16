@@ -75,19 +75,19 @@ const get_my_relationships = async (req, res, next) => {
   const trainers = await Promise.all(promises);
 
   const trainerInfo = trainers.map((t) => {
-    const accepted = relationships.filter((r) => r.trainer.toString() === t._id.toString())[0]
-      .accepted;
-    const metricsApprovalRequired = relationships.filter(
+    const relationship = relationships.find(
       (r) => r.trainer.toString() === t._id.toString()
-    )[0]?.metricsApprovalRequired ?? true;
+    );
+    const lastActivityAt = relationship?.updatedAt || relationship?.createdAt || null;
 
     return {
       firstName: t.firstName,
       lastName: t.lastName,
       trainer: t._id,
       profilePicture: t.profilePicture,
-      accepted,
-      metricsApprovalRequired,
+      accepted: relationship?.accepted ?? false,
+      metricsApprovalRequired: relationship?.metricsApprovalRequired ?? true,
+      lastActivityAt,
     };
   });
   res.send(trainerInfo);

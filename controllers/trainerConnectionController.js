@@ -151,6 +151,7 @@ const get_my_connections = async (req, res, next) => {
         ),
       },
       accepted: connections.filter((c) => c.status === "accepted"),
+      archived: connections.filter((c) => c.status === "rejected"),
     };
 
     res.json(organized);
