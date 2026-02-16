@@ -2,6 +2,7 @@ const Relationship = require("../models/relationship");
 const User = require("../models/user");
 const userController = require("./userController");
 const mongoose = require("mongoose");
+const { createAccessToken } = require("../services/tokenService");
 
 const manage_relationship = (req, res, next) => {
   req.body.client = res.locals.user._id;
@@ -75,19 +76,19 @@ const get_my_relationships = async (req, res, next) => {
   const trainers = await Promise.all(promises);
 
   const trainerInfo = trainers.map((t) => {
-    const accepted = relationships.filter((r) => r.trainer.toString() === t._id.toString())[0]
-      .accepted;
-    const metricsApprovalRequired = relationships.filter(
+    const relationship = relationships.find(
       (r) => r.trainer.toString() === t._id.toString()
-    )[0]?.metricsApprovalRequired ?? true;
+    );
+    const lastActivityAt = relationship?.updatedAt || relationship?.createdAt || null;
 
     return {
       firstName: t.firstName,
       lastName: t.lastName,
       trainer: t._id,
       profilePicture: t.profilePicture,
-      accepted,
-      metricsApprovalRequired,
+      accepted: relationship?.accepted ?? false,
+      metricsApprovalRequired: relationship?.metricsApprovalRequired ?? true,
+      lastActivityAt,
     };
   });
   res.send(trainerInfo);
@@ -134,6 +135,46 @@ const update_metrics_approval = (req, res, next) => {
     .catch((err) => next(err));
 };
 
+const issue_client_view_token = async (req, res, next) => {
+  try {
+    const trainerId = res.locals.user._id;
+    const { clientId } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({ error: "clientId is required." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(clientId)) {
+      return res.status(400).json({ error: "Invalid client ID." });
+    }
+
+    const relationship = await Relationship.findOne({
+      trainer: trainerId,
+      client: clientId,
+      accepted: true,
+    }).lean();
+
+    if (!relationship) {
+      return res.status(403).json({ error: "Not authorized for this client." });
+    }
+
+    const client = await User.findById(clientId).lean();
+    if (!client) {
+      return res.status(404).json({ error: "Client not found." });
+    }
+
+    const accessToken = createAccessToken(
+      client,
+      { viewOnly: true, trainerId },
+      { expiresIn: "60m" }
+    );
+
+    res.send({ accessToken, expiresIn: 3600 });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   manage_relationship,
   change_relationship_status,
@@ -142,4 +183,5 @@ module.exports = {
   get_my_clients,
   remove_relationship,
   update_metrics_approval,
+  issue_client_view_token,
 };
