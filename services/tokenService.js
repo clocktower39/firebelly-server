@@ -28,6 +28,7 @@ const buildTokenPayload = (user, overrides = {}) => ({
   adPersonalizationAllowed: Boolean(user.adPersonalizationAllowed),
   viewOnly: Boolean(overrides.viewOnly),
   guardianId: overrides.guardianId || null,
+  trainerId: overrides.trainerId || null,
 });
 
 const createTokens = (user, overrides = {}) => {

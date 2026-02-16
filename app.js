@@ -20,6 +20,8 @@ const groupRoutes = require("./routes/groupRoutes");
 const trainerConnectionRoutes = require("./routes/trainerConnectionRoutes");
 const metricRoutes = require("./routes/metricRoutes");
 const guardianRoutes = require("./routes/guardianRoutes");
+const GuardianLink = require("./models/guardianLink");
+const User = require("./models/user");
 const methodOverride = require("method-override");
 global.io = require("./io").initialize(http, {
   cors: {
@@ -134,6 +136,18 @@ const connectToDB = async () => {
   try {
     await mongoose.connect(dbUrl);
     console.log("MongoDB connection successful");
+    try {
+      await GuardianLink.syncIndexes();
+      console.log("GuardianLink indexes synced");
+    } catch (err) {
+      console.error("GuardianLink index sync failed:", err);
+    }
+    try {
+      await User.syncIndexes();
+      console.log("User indexes synced");
+    } catch (err) {
+      console.error("User index sync failed:", err);
+    }
   } catch (err) {
     console.error("MongoDB connection error:", err);
   }

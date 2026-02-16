@@ -79,10 +79,46 @@ const create_child = async (req, res, next) => {
 
     const savedChild = await user.save();
 
-    await GuardianLink.create({
-      guardianId,
-      childId: savedChild._id,
-    });
+    const createLink = async () =>
+      GuardianLink.create({
+        guardianId,
+        childId: savedChild._id,
+      });
+
+    try {
+      await createLink();
+    } catch (err) {
+      if (err?.code === 11000) {
+        try {
+          await GuardianLink.syncIndexes();
+          await createLink();
+        } catch (retryErr) {
+          await User.findByIdAndDelete(savedChild._id);
+          const keyPattern = retryErr?.keyPattern || err?.keyPattern || {};
+          const keyValue = retryErr?.keyValue || err?.keyValue || {};
+          const guardianOnlyUnique =
+            keyPattern.guardianId === 1 && !keyPattern.childId;
+          const guardianIndexName =
+            retryErr?.message?.includes("guardianId_1") ||
+            err?.message?.includes("guardianId_1");
+
+          if (guardianOnlyUnique || guardianIndexName) {
+            return res.status(409).json({
+              error:
+                "Unable to link child. Your database still has a unique index on guardianId. Drop index guardianId_1 in the GuardianLink collection, then retry.",
+            });
+          }
+
+          return res.status(409).json({
+            error: "Unable to link child. Guardian/child link already exists.",
+            details: keyValue,
+          });
+        }
+      }
+
+      await User.findByIdAndDelete(savedChild._id);
+      throw err;
+    }
 
     await ensureGuardianAccount(guardianId);
 

@@ -29,6 +29,11 @@ const metricsApprovalStatus = {
     }),
 }
 
+const clientViewTokenValidate = {
+    body: Joi.object({
+        clientId: Joi.string().required(),
+    }),
+}
 
 const router = express.Router();
 
@@ -39,5 +44,12 @@ router.post('/changeRelationshipStatus', validate(relationshipStatus, {}, {}), v
 router.post('/manageRelationship', validate(relationshipValidate, {}, {}), verifyAccessToken, ensureWriteAccess, relationshipController.manage_relationship);
 router.post('/removeRelationship', verifyAccessToken, ensureWriteAccess, relationshipController.remove_relationship);
 router.post('/relationships/metricsApproval', validate(metricsApprovalStatus, {}, {}), verifyAccessToken, ensureWriteAccess, relationshipController.update_metrics_approval);
+router.post(
+  '/relationships/client/token',
+  validate(clientViewTokenValidate, {}, {}),
+  verifyAccessToken,
+  ensureWriteAccess,
+  relationshipController.issue_client_view_token
+);
 
 module.exports = router;
