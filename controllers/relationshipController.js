@@ -165,7 +165,7 @@ const issue_client_view_token = async (req, res, next) => {
 
     const accessToken = createAccessToken(
       client,
-      { viewOnly: true, trainerId },
+      { trainerId },
       { expiresIn: "60m" }
     );
 
