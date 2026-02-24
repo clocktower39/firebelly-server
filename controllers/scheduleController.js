@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const ScheduleEvent = require("../models/scheduleEvent");
+const BillingLedgerEntry = require("../models/billingLedgerEntry");
 const User = require("../models/user");
 const Relationship = require("../models/relationship");
 const SessionType = require("../models/sessionType");
@@ -9,6 +10,53 @@ const APPOINTMENT_STATUSES = ["REQUESTED", "BOOKED", "COMPLETED"];
 const ensureRelationship = async (trainerId, clientId) => {
   if (!trainerId || !clientId) return null;
   return Relationship.findOne({ trainer: trainerId, client: clientId, accepted: true });
+};
+
+const getEventLedgerNet = async (eventId) => {
+  const summary = await BillingLedgerEntry.aggregate([
+    { $match: { eventId } },
+    { $group: { _id: null, net: { $sum: "$delta" } } },
+  ]);
+  return summary[0]?.net || 0;
+};
+
+const createEventDebitEntry = async ({ event, userId, source }) => {
+  if (!event || !event.clientId) return null;
+  const net = await getEventLedgerNet(event._id);
+  if (net < 0) return null;
+
+  const entry = new BillingLedgerEntry({
+    trainerId: event.trainerId,
+    clientId: event.clientId,
+    entryType: "DEBIT",
+    delta: -1,
+    source,
+    eventId: event._id,
+    notes: `Session ${source === "CANCELLATION_CHARGED" ? "cancellation charged" : "completed"}`,
+    createdBy: userId,
+  });
+  const saved = await entry.save();
+  await ScheduleEvent.findByIdAndUpdate(event._id, { billingLedgerEntryId: saved._id });
+  return saved;
+};
+
+const reverseEventDebitEntry = async ({ event, userId }) => {
+  if (!event || !event.clientId) return null;
+  const net = await getEventLedgerNet(event._id);
+  if (net >= 0) return null;
+
+  const reversal = new BillingLedgerEntry({
+    trainerId: event.trainerId,
+    clientId: event.clientId,
+    entryType: "ADJUSTMENT",
+    delta: Math.abs(net),
+    source: "REVERSAL",
+    eventId: event._id,
+    notes: "Reversed session debit",
+    createdBy: userId,
+  });
+
+  return reversal.save();
 };
 
 const normalizePrice = (amount, currency) => {
@@ -290,6 +338,17 @@ const update_schedule_event = async (req, res, next) => {
       }
     }
 
+    const previousStatus = existing.status;
+    const previousBillingStatus = existing.billingStatus;
+
+    if (updates?.status === "COMPLETED" && updates?.billingStatus === undefined) {
+      updates.billingStatus = "CHARGED";
+    }
+
+    if (updates?.status === "CANCELLED" && updates?.billingStatus === undefined) {
+      updates.billingStatus = "NO_CHARGE";
+    }
+
     if (updates?.sessionTypeId !== undefined) {
       const requestedId = updates.sessionTypeId || null;
       updates.sessionTypeId = requestedId
@@ -304,6 +363,49 @@ const update_schedule_event = async (req, res, next) => {
     }
     let updated = await ScheduleEvent.findByIdAndUpdate(_id, updates, { new: true });
     updated = await merge_open_availability(updated);
+
+    if (updated?.eventType === "APPOINTMENT" && updated.clientId) {
+      const updatedStatus = updated.status;
+      const updatedBillingStatus = updated.billingStatus;
+
+      const becameCompleted =
+        updatedStatus === "COMPLETED" &&
+        (previousStatus !== "COMPLETED" || previousBillingStatus !== updatedBillingStatus);
+      const becameCancelled =
+        updatedStatus === "CANCELLED" &&
+        (previousStatus !== "CANCELLED" || previousBillingStatus !== updatedBillingStatus);
+
+      const leftCompleted = previousStatus === "COMPLETED" && updatedStatus !== "COMPLETED";
+      const leftCancelled =
+        previousStatus === "CANCELLED" &&
+        previousBillingStatus === "CHARGED" &&
+        updatedStatus !== "CANCELLED";
+
+      if (becameCompleted && updatedBillingStatus === "CHARGED") {
+        await createEventDebitEntry({ event: updated, userId, source: "APPOINTMENT" });
+      }
+
+      if (becameCancelled && updatedBillingStatus === "CHARGED") {
+        await createEventDebitEntry({
+          event: updated,
+          userId,
+          source: "CANCELLATION_CHARGED",
+        });
+      }
+
+      if (updatedStatus === "CANCELLED" && updatedBillingStatus === "NO_CHARGE") {
+        await reverseEventDebitEntry({ event: updated, userId });
+      }
+
+      if (updatedStatus === "COMPLETED" && updatedBillingStatus === "NO_CHARGE") {
+        await reverseEventDebitEntry({ event: updated, userId });
+      }
+
+      if (leftCompleted || leftCancelled) {
+        await reverseEventDebitEntry({ event: updated, userId });
+      }
+    }
+
     return res.json({ event: updated });
   } catch (err) {
     return next(err);
@@ -313,7 +415,7 @@ const update_schedule_event = async (req, res, next) => {
 const cancel_schedule_event = async (req, res, next) => {
   try {
     const userId = res.locals.user._id;
-    const { _id } = req.body;
+    const { _id, billingStatus } = req.body;
 
     const existing = await ScheduleEvent.findById(_id);
     if (!existing) {
@@ -329,7 +431,25 @@ const cancel_schedule_event = async (req, res, next) => {
 
     existing.status = "CANCELLED";
     existing.cancelledBy = userId;
+    if (billingStatus && String(existing.trainerId) === String(userId)) {
+      existing.billingStatus = billingStatus;
+    } else {
+      existing.billingStatus = "NO_CHARGE";
+    }
     const updated = await existing.save();
+
+    if (updated?.eventType === "APPOINTMENT" && updated.clientId) {
+      if (updated.billingStatus === "CHARGED") {
+        await createEventDebitEntry({
+          event: updated,
+          userId,
+          source: "CANCELLATION_CHARGED",
+        });
+      } else {
+        await reverseEventDebitEntry({ event: updated, userId });
+      }
+    }
+
     return res.json({ event: updated });
   } catch (err) {
     return next(err);
