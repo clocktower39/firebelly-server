@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 const ScheduleEvent = require("../models/scheduleEvent");
-const BillingLedgerEntry = require("../models/billingLedgerEntry");
 const User = require("../models/user");
 const Relationship = require("../models/relationship");
 const SessionType = require("../models/sessionType");
+const { createEventDebitEntry, reverseEventDebitEntry } = require("../services/billingLedgerService");
 
 const APPOINTMENT_STATUSES = ["REQUESTED", "BOOKED", "COMPLETED"];
 
@@ -12,52 +12,14 @@ const ensureRelationship = async (trainerId, clientId) => {
   return Relationship.findOne({ trainer: trainerId, client: clientId, accepted: true });
 };
 
-const getEventLedgerNet = async (eventId) => {
-  const summary = await BillingLedgerEntry.aggregate([
-    { $match: { eventId } },
-    { $group: { _id: null, net: { $sum: "$delta" } } },
-  ]);
-  return summary[0]?.net || 0;
+const isWithinCancellationWindow = (eventStartDate, windowHours = 24) => {
+  if (!eventStartDate) return false;
+  const now = new Date();
+  const start = new Date(eventStartDate);
+  const diffMs = start - now;
+  return diffMs <= windowHours * 60 * 60 * 1000;
 };
 
-const createEventDebitEntry = async ({ event, userId, source }) => {
-  if (!event || !event.clientId) return null;
-  const net = await getEventLedgerNet(event._id);
-  if (net < 0) return null;
-
-  const entry = new BillingLedgerEntry({
-    trainerId: event.trainerId,
-    clientId: event.clientId,
-    entryType: "DEBIT",
-    delta: -1,
-    source,
-    eventId: event._id,
-    notes: `Session ${source === "CANCELLATION_CHARGED" ? "cancellation charged" : "completed"}`,
-    createdBy: userId,
-  });
-  const saved = await entry.save();
-  await ScheduleEvent.findByIdAndUpdate(event._id, { billingLedgerEntryId: saved._id });
-  return saved;
-};
-
-const reverseEventDebitEntry = async ({ event, userId }) => {
-  if (!event || !event.clientId) return null;
-  const net = await getEventLedgerNet(event._id);
-  if (net >= 0) return null;
-
-  const reversal = new BillingLedgerEntry({
-    trainerId: event.trainerId,
-    clientId: event.clientId,
-    entryType: "ADJUSTMENT",
-    delta: Math.abs(net),
-    source: "REVERSAL",
-    eventId: event._id,
-    notes: "Reversed session debit",
-    createdBy: userId,
-  });
-
-  return reversal.save();
-};
 
 const normalizePrice = (amount, currency) => {
   if (amount === undefined) return {};
@@ -346,7 +308,9 @@ const update_schedule_event = async (req, res, next) => {
     }
 
     if (updates?.status === "CANCELLED" && updates?.billingStatus === undefined) {
-      updates.billingStatus = "NO_CHARGE";
+      updates.billingStatus = isWithinCancellationWindow(existing.startDateTime)
+        ? "CHARGED"
+        : "NO_CHARGE";
     }
 
     if (updates?.sessionTypeId !== undefined) {
@@ -434,7 +398,9 @@ const cancel_schedule_event = async (req, res, next) => {
     if (billingStatus && String(existing.trainerId) === String(userId)) {
       existing.billingStatus = billingStatus;
     } else {
-      existing.billingStatus = "NO_CHARGE";
+      existing.billingStatus = isWithinCancellationWindow(existing.startDateTime)
+        ? "CHARGED"
+        : "NO_CHARGE";
     }
     const updated = await existing.save();
 

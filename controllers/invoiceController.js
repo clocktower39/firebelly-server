@@ -6,6 +6,8 @@ const Relationship = require("../models/relationship");
 const GroupMembership = require("../models/groupMembership");
 const Group = require("../models/group");
 const User = require("../models/user");
+const Product = require("../models/product");
+const SessionType = require("../models/sessionType");
 const { sendEmail } = require("../services/emailService");
 const { buildInvoicePdf } = require("../services/invoicePdf");
 
@@ -40,14 +42,21 @@ const normalizeNumber = (value, fallback = 0) => {
 const buildInvoiceNumber = () =>
   `INV-${dayjs().format("YYYYMMDD")}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
+const LINE_ITEM_TYPES = new Set(["SESSION", "PROGRAM", "NUTRITION", "MERCH", "CUSTOM"]);
+
 const normalizeLineItems = (lineItems = []) =>
   lineItems.map((item) => {
     const quantity = Math.max(1, normalizeNumber(item.quantity, 1));
     const unitPrice = Math.max(0, normalizeNumber(item.unitPrice, 0));
-    const sessionCredits = Math.max(0, normalizeNumber(item.sessionCredits, 0));
+    const itemType = LINE_ITEM_TYPES.has(item.itemType) ? item.itemType : "CUSTOM";
+    const rawSessionCredits = Math.max(0, normalizeNumber(item.sessionCredits, 0));
+    const sessionCredits = itemType === "SESSION" ? rawSessionCredits : 0;
     const lineTotal = unitPrice * quantity;
     const sessionCreditsTotal = sessionCredits * quantity;
     return {
+      productId: item.productId || null,
+      itemType,
+      sessionTypeId: itemType === "SESSION" ? item.sessionTypeId || null : null,
       description: String(item.description || "").trim() || "Line item",
       quantity,
       unitPrice,
@@ -57,6 +66,63 @@ const normalizeLineItems = (lineItems = []) =>
       sessionCreditsTotal,
     };
   });
+
+const resolveLineItems = async (lineItems = [], trainerId) => {
+  const sessionTypeCache = new Map();
+  const resolved = [];
+
+  for (const rawItem of lineItems) {
+    let item = { ...rawItem };
+
+    if (item.productId) {
+      const product = await Product.findById(item.productId).lean();
+      if (product && String(product.trainerId) === String(trainerId)) {
+        item = {
+          ...item,
+          itemType: product.itemType,
+          description: product.name,
+          unitPrice: product.price,
+          taxable: product.taxable,
+          sessionTypeId: product.sessionTypeId || null,
+          sessionCredits:
+            product.itemType === "SESSION" ? Number(product.creditsPerUnit) || 0 : 0,
+        };
+      }
+    }
+
+    if (item.itemType === "SESSION") {
+      const sessionTypeId = item.sessionTypeId || null;
+      if (sessionTypeId) {
+        const cacheKey = String(sessionTypeId);
+        if (!sessionTypeCache.has(cacheKey)) {
+          const sessionType = await SessionType.findOne({
+            _id: sessionTypeId,
+            trainerId,
+          }).lean();
+          const credits = Number(sessionType?.creditsRequired);
+          sessionTypeCache.set(
+            cacheKey,
+            Number.isFinite(credits) && credits > 0 ? credits : null
+          );
+        }
+        const resolvedCredits = sessionTypeCache.get(cacheKey);
+        if (!resolvedCredits) {
+          item.sessionTypeId = null;
+          item.sessionCredits = 0;
+        } else if (!item.sessionCredits || Number(item.sessionCredits) <= 0) {
+          item.sessionCredits = resolvedCredits;
+        }
+      }
+    } else {
+      item.sessionCredits = 0;
+      item.sessionTypeId = null;
+    }
+
+    resolved.push(item);
+  }
+
+  return normalizeLineItems(resolved);
+};
 
 const normalizePayments = (payments = []) =>
   payments
@@ -91,21 +157,63 @@ const calculateTotals = ({ lineItems, tax, discount }) => {
   };
 };
 
+const resolveBillTo = async ({ billToType, clientId, groupId }) => {
+  let billToName = "";
+  let billToEmail = "";
+  if (billToType === "CLIENT" && clientId) {
+    const client = await User.findById(clientId).lean();
+    billToName = client ? `${client.firstName} ${client.lastName}` : "";
+    billToEmail = client?.email || "";
+  }
+  if (billToType === "GROUP" && groupId) {
+    const group = await Group.findById(groupId).lean();
+    billToName = group?.name || "";
+  }
+  return { billToName, billToEmail };
+};
+
 const applyInvoiceCredits = async (invoice, userId) => {
   const creditEntries = [];
+  const sessionTypeCache = new Map();
+
+  const resolveCreditsPerUnit = async (item) => {
+    const direct = Number(item.sessionCredits || 0);
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    if (!item.sessionTypeId) return 0;
+    const cacheKey = String(item.sessionTypeId);
+    if (!sessionTypeCache.has(cacheKey)) {
+      const type = await SessionType.findById(item.sessionTypeId).lean();
+      const credits = Number(type?.creditsRequired || 0);
+      sessionTypeCache.set(cacheKey, Number.isFinite(credits) ? credits : 0);
+    }
+    return sessionTypeCache.get(cacheKey) || 0;
+  };
+
   for (const item of invoice.lineItems || []) {
-    const totalCredits = Number(item.sessionCreditsTotal || 0);
+    let totalCredits = Number(item.sessionCreditsTotal || 0);
+
+    if (!totalCredits && item.itemType === "SESSION") {
+      const creditsPerUnit = await resolveCreditsPerUnit(item);
+      const quantity = Math.max(1, Number(item.quantity) || 1);
+      if (creditsPerUnit > 0) {
+        totalCredits = creditsPerUnit * quantity;
+      }
+    }
+
     if (!totalCredits) continue;
+
     const exists = await BillingLedgerEntry.exists({
       sourceInvoiceId: invoice._id,
       sourceLineItemId: item._id,
       entryType: "CREDIT",
     });
     if (exists) continue;
+
     creditEntries.push({
       trainerId: invoice.trainerId,
       clientId: invoice.clientId || null,
       groupId: invoice.groupId || null,
+      sessionTypeId: item.sessionTypeId || null,
       entryType: "CREDIT",
       delta: totalCredits,
       source: "INVOICE",
@@ -140,6 +248,7 @@ const reverseInvoiceCredits = async (invoice, userId) => {
     trainerId: invoice.trainerId,
     clientId: invoice.clientId || null,
     groupId: invoice.groupId || null,
+    sessionTypeId: credit.sessionTypeId || null,
     entryType: "ADJUSTMENT",
     delta: -Number(credit.delta || 0),
     source: "REVERSAL",
@@ -151,6 +260,9 @@ const reverseInvoiceCredits = async (invoice, userId) => {
 
   await BillingLedgerEntry.insertMany(reversals);
 };
+
+const removeInvoiceReversals = async (invoiceId) =>
+  BillingLedgerEntry.deleteMany({ sourceInvoiceId: invoiceId, source: "REVERSAL" });
 
 const create_invoice = async (req, res, next) => {
   try {
@@ -204,22 +316,26 @@ const create_invoice = async (req, res, next) => {
       }
     }
 
-    const normalizedLineItems = normalizeLineItems(lineItems);
+    const normalizedLineItems = await resolveLineItems(lineItems, userId);
+    const invalidSessionItem = normalizedLineItems.find(
+      (item) => item.itemType === "SESSION" && (!item.sessionTypeId || item.sessionCredits <= 0)
+    );
+    if (invalidSessionItem) {
+      return res.status(400).json({
+        error: "Session line items must include a session type with credits.",
+      });
+    }
     const totals = calculateTotals({ lineItems: normalizedLineItems, tax, discount });
     const normalizedPayments = normalizePayments(payments);
     const amountPaid = normalizedPayments.reduce((sum, payment) => sum + payment.amount, 0);
     const balanceDue = Math.max(totals.total - amountPaid, 0);
 
-    let billToName = "";
-    let resolvedBillToEmail = "";
-    if (billToType === "CLIENT" && clientId) {
-      const client = await User.findById(clientId).lean();
-      billToName = client ? `${client.firstName} ${client.lastName}` : "";
-      resolvedBillToEmail = client?.email || "";
-    }
-    if (billToType === "GROUP" && groupId) {
-      const group = await Group.findById(groupId).lean();
-      billToName = group?.name || "";
+    let { billToName, billToEmail: resolvedBillToEmail } = await resolveBillTo({
+      billToType,
+      clientId,
+      groupId,
+    });
+    if (billToType === "GROUP") {
       resolvedBillToEmail = String(billToEmail || "").trim();
     }
 
@@ -288,6 +404,121 @@ const create_invoice = async (req, res, next) => {
     }
 
     return res.json({ invoice: saved });
+  } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(409).json({ error: "Invoice number already exists." });
+    }
+    return next(err);
+  }
+};
+
+const request_invoice = async (req, res, next) => {
+  try {
+    const userId = res.locals.user._id;
+    const isTrainer = res.locals.user?.isTrainer;
+    const {
+      trainerId,
+      invoiceNumber,
+      currency,
+      issuedAt,
+      dueAt,
+      notes,
+      terms,
+      lineItems = [],
+      tax,
+      discount,
+    } = req.body;
+
+    if (!trainerId || !isValidObjectId(trainerId)) {
+      return res.status(400).json({ error: "trainerId is required." });
+    }
+
+    if (isTrainer && String(trainerId) === String(userId)) {
+      return res.status(400).json({ error: "Trainers should create invoices directly." });
+    }
+
+    const relationship = await ensureRelationship(trainerId, userId);
+    if (!relationship) {
+      return res.status(403).json({ error: "Unauthorized access." });
+    }
+
+    const normalizedLineItems = await resolveLineItems(lineItems, trainerId);
+    const invalidSessionItem = normalizedLineItems.find(
+      (item) => item.itemType === "SESSION" && (!item.sessionTypeId || item.sessionCredits <= 0)
+    );
+    if (invalidSessionItem) {
+      return res.status(400).json({
+        error: "Session line items must include a session type with credits.",
+      });
+    }
+    if (normalizedLineItems.length === 0) {
+      return res.status(400).json({ error: "At least one line item is required." });
+    }
+
+    const totals = calculateTotals({ lineItems: normalizedLineItems, tax, discount });
+    const finalInvoiceNumber = String(invoiceNumber || "").trim() || buildInvoiceNumber();
+
+    const { billToName, billToEmail } = await resolveBillTo({
+      billToType: "CLIENT",
+      clientId: userId,
+      groupId: null,
+    });
+
+    const invoice = new Invoice({
+      trainerId,
+      clientId: userId,
+      groupId: null,
+      billToType: "CLIENT",
+      billToName,
+      billToEmail,
+      invoiceNumber: finalInvoiceNumber,
+      status: "SENT",
+      currency: currency || "USD",
+      issuedAt: issuedAt ? new Date(issuedAt) : new Date(),
+      dueAt: dueAt ? new Date(dueAt) : null,
+      notes: String(notes || "").trim(),
+      terms: String(terms || "").trim(),
+      lineItems: normalizedLineItems,
+      subtotal: totals.subtotal,
+      tax: totals.tax,
+      discount: totals.discount,
+      total: totals.total,
+      amountPaid: 0,
+      balanceDue: totals.total,
+      payments: [],
+      sessionCreditsTotal: totals.sessionCreditsTotal,
+      createdBy: userId,
+      updatedBy: userId,
+    });
+
+    const saved = await invoice.save();
+
+    let notificationStatus = "not_sent";
+    try {
+      const trainer = await User.findById(trainerId).lean();
+      const client = await User.findById(userId).lean();
+      if (trainer?.email) {
+        const lines = normalizedLineItems
+          .map((item) => `${item.quantity} × ${item.description}`)
+          .join("\n");
+        await sendEmail({
+          from: trainer.email || process.env.EMAIL_USER,
+          to: trainer.email,
+          subject: `New invoice request from ${client?.firstName || "Client"}`,
+          text:
+            `You have a new invoice request from ${client?.firstName || ""} ${
+              client?.lastName || ""
+            }.\n\nItems:\n${lines}\n\nTotal: ${saved.currency} ${Number(
+              saved.total || 0
+            ).toFixed(2)}\nInvoice #: ${saved.invoiceNumber}`,
+        });
+        notificationStatus = "sent";
+      }
+    } catch (err) {
+      notificationStatus = "failed";
+    }
+
+    return res.json({ invoice: saved, notificationStatus });
   } catch (err) {
     if (err?.code === 11000) {
       return res.status(409).json({ error: "Invoice number already exists." });
@@ -398,6 +629,7 @@ const update_invoice_status = async (req, res, next) => {
     }
 
     const updates = {};
+    const wasVoided = invoice.status === "VOID";
     if (dueAt !== undefined) updates.dueAt = dueAt ? new Date(dueAt) : null;
     if (notes !== undefined) updates.notes = String(notes || "").trim();
     if (terms !== undefined) updates.terms = String(terms || "").trim();
@@ -427,6 +659,9 @@ const update_invoice_status = async (req, res, next) => {
     if (nextStatus === "VOID") {
       updates.voidedAt = new Date();
     }
+    if (nextStatus && nextStatus !== "VOID") {
+      updates.voidedAt = null;
+    }
 
     updates.updatedBy = userId;
 
@@ -434,7 +669,10 @@ const update_invoice_status = async (req, res, next) => {
     const saved = await invoice.save();
 
     if (nextStatus === "PAID") {
+      await removeInvoiceReversals(saved._id);
       await applyInvoiceCredits(saved, userId);
+    } else if (wasVoided && nextStatus && nextStatus !== "VOID") {
+      await removeInvoiceReversals(saved._id);
     }
 
     if (nextStatus === "VOID") {
@@ -652,6 +890,7 @@ const email_invoice = async (req, res, next) => {
 
 module.exports = {
   create_invoice,
+  request_invoice,
   list_invoices,
   get_invoice,
   update_invoice_status,
