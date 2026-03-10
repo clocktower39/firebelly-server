@@ -2,6 +2,13 @@ const mongoose = require("mongoose");
 
 const invoiceLineItemSchema = new mongoose.Schema(
   {
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", default: null },
+    itemType: {
+      type: String,
+      enum: ["SESSION", "PROGRAM", "NUTRITION", "MERCH", "CUSTOM"],
+      default: "CUSTOM",
+    },
+    sessionTypeId: { type: mongoose.Schema.Types.ObjectId, ref: "SessionType", default: null },
     description: { type: String, required: true },
     quantity: { type: Number, default: 1, min: 1 },
     unitPrice: { type: Number, default: 0, min: 0 },

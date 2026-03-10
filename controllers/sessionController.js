@@ -109,11 +109,38 @@ const get_session_summary = async (req, res, next) => {
 
     const summary = ledgerSummary[0] || { balance: 0, credits: 0, debits: 0 };
 
+    const byType = await BillingLedgerEntry.aggregate([
+      { $match: { trainerId, clientId } },
+      {
+        $group: {
+          _id: "$sessionTypeId",
+          balance: { $sum: "$delta" },
+          credits: {
+            $sum: {
+              $cond: [{ $gt: ["$delta", 0] }, "$delta", 0],
+            },
+          },
+          debits: {
+            $sum: {
+              $cond: [{ $lt: ["$delta", 0] }, "$delta", 0],
+            },
+          },
+        },
+      },
+    ]);
+
     return res.json({
       purchasedSessions: summary.credits,
       completedAppointments: Math.abs(summary.debits),
       remainingSessions: summary.balance,
       dueForPayment: summary.balance <= 0,
+      bySessionType: byType.map((entry) => ({
+        sessionTypeId: entry._id || null,
+        remainingSessions: entry.balance,
+        credits: entry.credits,
+        debits: Math.abs(entry.debits),
+        dueForPayment: entry.balance <= 0,
+      })),
     });
   } catch (err) {
     return next(err);

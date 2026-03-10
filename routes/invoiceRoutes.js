@@ -6,6 +6,7 @@ const { ensureWriteAccess } = require("../middleware/ensureWriteAccess");
 const router = express.Router();
 
 router.post("/invoices", verifyAccessToken, ensureWriteAccess, invoiceController.create_invoice);
+router.post("/invoices/request", verifyAccessToken, invoiceController.request_invoice);
 router.post("/invoices/list", verifyAccessToken, invoiceController.list_invoices);
 router.post("/invoices/detail", verifyAccessToken, invoiceController.get_invoice);
 router.post("/invoices/status", verifyAccessToken, ensureWriteAccess, invoiceController.update_invoice_status);

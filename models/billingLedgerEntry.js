@@ -5,6 +5,12 @@ const billingLedgerEntrySchema = new mongoose.Schema(
     trainerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
     groupId: { type: mongoose.Schema.Types.ObjectId, ref: "Group", default: null, index: true },
+    sessionTypeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SessionType",
+      default: null,
+      index: true,
+    },
     entryType: {
       type: String,
       enum: ["CREDIT", "DEBIT", "ADJUSTMENT"],
@@ -43,6 +49,7 @@ const billingLedgerEntrySchema = new mongoose.Schema(
 
 billingLedgerEntrySchema.index({ trainerId: 1, clientId: 1, createdAt: -1 });
 billingLedgerEntrySchema.index({ trainerId: 1, groupId: 1, createdAt: -1 });
+billingLedgerEntrySchema.index({ trainerId: 1, clientId: 1, sessionTypeId: 1, createdAt: -1 });
 
 const BillingLedgerEntry = mongoose.model("BillingLedgerEntry", billingLedgerEntrySchema);
 module.exports = BillingLedgerEntry;

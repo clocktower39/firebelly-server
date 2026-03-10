@@ -1,5 +1,6 @@
 const Training = require("../models/training");
 const ScheduleEvent = require("../models/scheduleEvent");
+const { createEventDebitEntry, reverseEventDebitEntry } = require("../services/billingLedgerService");
 const Relationship = require("../models/relationship");
 const mongoose = require("mongoose");
 const dayjs = require("dayjs");
@@ -42,22 +43,68 @@ const create_training = async (req, res, next) => {
   }
 };
 
-const update_training = (req, res, next) => {
-  Training.findByIdAndUpdate(req.body._id, { ...req.body.training }, { new: true })
-    .populate({
-      path: "training.exercise",
-      model: "Exercise",
-      select: "_id exerciseTitle",
-    })
-    .populate({
-      path: "user workoutFeedback.comments.user workoutFeedback.comments.deletedBy training.feedback.comments.user training.feedback.comments.deletedBy",
-      model: "User",
-      select: "_id firstName lastName profilePicture",
-    })
-    .then((training) => {
-      res.send({ training });
-    })
-    .catch((err) => next(err));
+const update_training = async (req, res, next) => {
+  try {
+    const existing = await Training.findById(req.body._id).lean();
+    const training = await Training.findByIdAndUpdate(
+      req.body._id,
+      { ...req.body.training },
+      { new: true }
+    )
+      .populate({
+        path: "training.exercise",
+        model: "Exercise",
+        select: "_id exerciseTitle",
+      })
+      .populate({
+        path: "user workoutFeedback.comments.user workoutFeedback.comments.deletedBy training.feedback.comments.user training.feedback.comments.deletedBy",
+        model: "User",
+        select: "_id firstName lastName profilePicture",
+      });
+
+    if (!training) {
+      return res.status(404).json({ error: "Training not found." });
+    }
+
+    if (existing) {
+      const wasComplete = !!existing.complete;
+      const isComplete = !!training.complete;
+      if (wasComplete !== isComplete) {
+        const event = await ScheduleEvent.findOne({ workoutId: training._id });
+        if (event && event.eventType === "APPOINTMENT" && event.status !== "CANCELLED") {
+          if (isComplete) {
+            const updates = { status: "COMPLETED" };
+            if (!event.billingStatus || event.billingStatus === "UNBILLED") {
+              updates.billingStatus = "CHARGED";
+            }
+            const updatedEvent = await ScheduleEvent.findByIdAndUpdate(event._id, updates, {
+              new: true,
+            });
+            if (updatedEvent?.billingStatus === "CHARGED") {
+              await createEventDebitEntry({
+                event: updatedEvent,
+                userId: res.locals.user._id,
+                source: "APPOINTMENT",
+              });
+            } else {
+              await reverseEventDebitEntry({ event: updatedEvent, userId: res.locals.user._id });
+            }
+          } else if (event.status === "COMPLETED") {
+            const updatedEvent = await ScheduleEvent.findByIdAndUpdate(
+              event._id,
+              { status: "BOOKED" },
+              { new: true }
+            );
+            await reverseEventDebitEntry({ event: updatedEvent, userId: res.locals.user._id });
+          }
+        }
+      }
+    }
+
+    return res.send({ training });
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const get_training_by_id = (req, res, next) => {

@@ -18,10 +18,35 @@ const ensureGroupAccess = async (groupId, userId) => {
   return GroupMembership.findOne({ groupId, userId, status: ACTIVE_STATUS });
 };
 
+const buildVoidedInvoiceFilterStages = () => [
+  {
+    $lookup: {
+      from: "invoices",
+      localField: "sourceInvoiceId",
+      foreignField: "_id",
+      as: "invoice",
+    },
+  },
+  {
+    $addFields: {
+      invoiceStatus: { $ifNull: [{ $arrayElemAt: ["$invoice.status", 0] }, null] },
+    },
+  },
+  {
+    $match: {
+      $or: [
+        { sourceInvoiceId: { $eq: null } },
+        { invoiceStatus: { $ne: "VOID" } },
+      ],
+    },
+  },
+  { $project: { invoice: 0, invoiceStatus: 0 } },
+];
+
 const buildLedgerMatch = ({ trainerId, clientId, groupId }) => {
-  const match = { trainerId };
-  if (clientId) match.clientId = clientId;
-  if (groupId) match.groupId = groupId;
+  const match = { trainerId: new mongoose.Types.ObjectId(trainerId) };
+  if (clientId) match.clientId = new mongoose.Types.ObjectId(clientId);
+  if (groupId) match.groupId = new mongoose.Types.ObjectId(groupId);
   return match;
 };
 
@@ -56,8 +81,10 @@ const get_summary = async (req, res, next) => {
     }
 
     const match = buildLedgerMatch({ trainerId, clientId, groupId });
+    const baseStages = [{ $match: match }, ...buildVoidedInvoiceFilterStages()];
+
     const summaryAgg = await BillingLedgerEntry.aggregate([
-      { $match: match },
+      ...baseStages,
       {
         $group: {
           _id: null,
@@ -86,6 +113,38 @@ const get_summary = async (req, res, next) => {
       entryCount: 0,
     };
 
+    const byTypeAgg = await BillingLedgerEntry.aggregate([
+      ...baseStages,
+      {
+        $group: {
+          _id: "$sessionTypeId",
+          balance: { $sum: "$delta" },
+          credits: {
+            $sum: {
+              $cond: [{ $gt: ["$delta", 0] }, "$delta", 0],
+            },
+          },
+          debits: {
+            $sum: {
+              $cond: [{ $lt: ["$delta", 0] }, "$delta", 0],
+            },
+          },
+          lastEntryAt: { $max: "$createdAt" },
+          entryCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const bySessionType = byTypeAgg.map((entry) => ({
+      sessionTypeId: entry._id || null,
+      remainingSessions: entry.balance,
+      credits: entry.credits,
+      debits: Math.abs(entry.debits),
+      lastEntryAt: entry.lastEntryAt,
+      entryCount: entry.entryCount,
+      dueForPayment: entry.balance <= 0,
+    }));
+
     return res.json({
       remainingSessions: summary.balance,
       credits: summary.credits,
@@ -93,6 +152,7 @@ const get_summary = async (req, res, next) => {
       lastEntryAt: summary.lastEntryAt,
       entryCount: summary.entryCount,
       dueForPayment: summary.balance <= 0,
+      bySessionType,
     });
   } catch (err) {
     return next(err);
@@ -103,7 +163,7 @@ const list_ledger_entries = async (req, res, next) => {
   try {
     const userId = res.locals.user._id;
     const isTrainer = res.locals.user?.isTrainer;
-    const { trainerId, clientId, groupId, limit = 100 } = req.body;
+    const { trainerId, clientId, groupId, sessionTypeId, limit = 100 } = req.body;
 
     if (!trainerId || !isValidObjectId(trainerId)) {
       return res.status(400).json({ error: "trainerId is required." });
@@ -130,6 +190,7 @@ const list_ledger_entries = async (req, res, next) => {
     }
 
     const match = buildLedgerMatch({ trainerId, clientId, groupId });
+    if (sessionTypeId) match.sessionTypeId = sessionTypeId;
     const entries = await BillingLedgerEntry.find(match)
       .sort({ createdAt: -1 })
       .limit(Math.min(Number(limit) || 100, 500))
@@ -144,7 +205,7 @@ const list_ledger_entries = async (req, res, next) => {
 const create_adjustment = async (req, res, next) => {
   try {
     const userId = res.locals.user._id;
-    const { trainerId, clientId, groupId, delta, notes = "" } = req.body;
+    const { trainerId, clientId, groupId, sessionTypeId, delta, notes = "" } = req.body;
 
     if (!trainerId || !isValidObjectId(trainerId)) {
       return res.status(400).json({ error: "trainerId is required." });
@@ -167,6 +228,7 @@ const create_adjustment = async (req, res, next) => {
       trainerId,
       clientId: clientId || null,
       groupId: groupId || null,
+      sessionTypeId: sessionTypeId || null,
       entryType: "ADJUSTMENT",
       delta: numericDelta,
       source: "ADJUSTMENT",
