@@ -1,6 +1,6 @@
 const SessionPurchase = require("../models/sessionPurchase");
-const ScheduleEvent = require("../models/scheduleEvent");
 const Relationship = require("../models/relationship");
+const BillingLedgerEntry = require("../models/billingLedgerEntry");
 
 const ensureRelationship = async (trainerId, clientId) => {
   if (!trainerId || !clientId) return null;
@@ -87,34 +87,60 @@ const get_session_summary = async (req, res, next) => {
       }
     }
 
-    const now = new Date();
-    const purchases = await SessionPurchase.find({
-      trainerId,
-      clientId,
-      active: true,
-      $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
-    }).lean();
+    const ledgerSummary = await BillingLedgerEntry.aggregate([
+      { $match: { trainerId, clientId } },
+      {
+        $group: {
+          _id: null,
+          balance: { $sum: "$delta" },
+          credits: {
+            $sum: {
+              $cond: [{ $gt: ["$delta", 0] }, "$delta", 0],
+            },
+          },
+          debits: {
+            $sum: {
+              $cond: [{ $lt: ["$delta", 0] }, "$delta", 0],
+            },
+          },
+        },
+      },
+    ]);
 
-    const purchasedSessions = purchases.reduce(
-      (total, purchase) => total + (purchase.sessionsPurchased || 0),
-      0
-    );
+    const summary = ledgerSummary[0] || { balance: 0, credits: 0, debits: 0 };
 
-    const completedAppointments = await ScheduleEvent.countDocuments({
-      trainerId,
-      clientId,
-      eventType: "APPOINTMENT",
-      status: "COMPLETED",
-    });
-
-    const remainingSessions = Math.max(purchasedSessions - completedAppointments, 0);
-    const dueForPayment = purchasedSessions === 0 || remainingSessions === 0;
+    const byType = await BillingLedgerEntry.aggregate([
+      { $match: { trainerId, clientId } },
+      {
+        $group: {
+          _id: "$sessionTypeId",
+          balance: { $sum: "$delta" },
+          credits: {
+            $sum: {
+              $cond: [{ $gt: ["$delta", 0] }, "$delta", 0],
+            },
+          },
+          debits: {
+            $sum: {
+              $cond: [{ $lt: ["$delta", 0] }, "$delta", 0],
+            },
+          },
+        },
+      },
+    ]);
 
     return res.json({
-      purchasedSessions,
-      completedAppointments,
-      remainingSessions,
-      dueForPayment,
+      purchasedSessions: summary.credits,
+      completedAppointments: Math.abs(summary.debits),
+      remainingSessions: summary.balance,
+      dueForPayment: summary.balance <= 0,
+      bySessionType: byType.map((entry) => ({
+        sessionTypeId: entry._id || null,
+        remainingSessions: entry.balance,
+        credits: entry.credits,
+        debits: Math.abs(entry.debits),
+        dueForPayment: entry.balance <= 0,
+      })),
     });
   } catch (err) {
     return next(err);
