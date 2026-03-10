@@ -20,6 +20,9 @@ const groupRoutes = require("./routes/groupRoutes");
 const trainerConnectionRoutes = require("./routes/trainerConnectionRoutes");
 const metricRoutes = require("./routes/metricRoutes");
 const guardianRoutes = require("./routes/guardianRoutes");
+const billingRoutes = require("./routes/billingRoutes");
+const invoiceRoutes = require("./routes/invoiceRoutes");
+const productRoutes = require("./routes/productRoutes");
 const GuardianLink = require("./models/guardianLink");
 const User = require("./models/user");
 const methodOverride = require("method-override");
@@ -66,6 +69,9 @@ app.use("/", groupRoutes);
 app.use("/", trainerConnectionRoutes);
 app.use("/", metricRoutes);
 app.use("/", guardianRoutes);
+app.use("/", billingRoutes);
+app.use("/", invoiceRoutes);
+app.use("/", productRoutes);
 
 const connectedClients = {};
 

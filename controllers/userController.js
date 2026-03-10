@@ -8,6 +8,7 @@ const { verifyRefreshToken } = require("../middleware/auth");
 const { sendEmail } = require("../services/emailService")
 const { createTokens } = require("../services/tokenService");
 const { getAgeBand } = require("../utils/age");
+const { ensureDefaultSessionTypes } = require("./sessionTypeController");
 
 const signup_user = async (req, res, next) => {
   try {
@@ -311,24 +312,46 @@ const change_password = (req, res, next) => {
     .catch((err) => next(err));
 };
 
-const update_user = (req, res, next) => {
-  User.findByIdAndUpdate(res.locals.user._id, { ...req.body }, { new: true })
-    .then((user) => {
-      if (!user) {
-        res.send({
-          status: "error",
-          err: "",
-        });
-      } else {
-        const tokens = createTokens(user);
-        res.send({
-          status: "success",
-          user,
-          accessToken: tokens.accessToken,
-        });
-      }
-    })
-    .catch((err) => next(err));
+const update_user = async (req, res, next) => {
+  try {
+    const existing = await User.findById(res.locals.user._id);
+    if (!existing) {
+      return res.send({
+        status: "error",
+        err: "",
+      });
+    }
+
+    const requestedTrainer =
+      req.body?.isTrainer === true || req.body?.isTrainer === "true";
+    const becomingTrainer = !existing.isTrainer && requestedTrainer;
+
+    const user = await User.findByIdAndUpdate(
+      res.locals.user._id,
+      { ...req.body },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.send({
+        status: "error",
+        err: "",
+      });
+    }
+
+    if (becomingTrainer) {
+      await ensureDefaultSessionTypes(user._id);
+    }
+
+    const tokens = createTokens(user);
+    return res.send({
+      status: "success",
+      user,
+      accessToken: tokens.accessToken,
+    });
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const checkAuthLoginToken = (req, res, next) => {

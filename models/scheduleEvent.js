@@ -34,6 +34,12 @@ const scheduleEventSchema = new mongoose.Schema(
     },
     requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    billingStatus: {
+      type: String,
+      enum: ["UNBILLED", "CHARGED", "NO_CHARGE"],
+      default: "UNBILLED",
+    },
+    billingLedgerEntryId: { type: mongoose.Schema.Types.ObjectId, ref: "BillingLedgerEntry", default: null },
     notes: { type: String, default: "" },
     sessionTypeId: { type: mongoose.Schema.Types.ObjectId, ref: "SessionType", default: null },
     priceAmount: { type: Number, default: null, min: 0 },

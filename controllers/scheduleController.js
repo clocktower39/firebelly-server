@@ -3,6 +3,7 @@ const ScheduleEvent = require("../models/scheduleEvent");
 const User = require("../models/user");
 const Relationship = require("../models/relationship");
 const SessionType = require("../models/sessionType");
+const { createEventDebitEntry, reverseEventDebitEntry } = require("../services/billingLedgerService");
 
 const APPOINTMENT_STATUSES = ["REQUESTED", "BOOKED", "COMPLETED"];
 
@@ -10,6 +11,15 @@ const ensureRelationship = async (trainerId, clientId) => {
   if (!trainerId || !clientId) return null;
   return Relationship.findOne({ trainer: trainerId, client: clientId, accepted: true });
 };
+
+const isWithinCancellationWindow = (eventStartDate, windowHours = 24) => {
+  if (!eventStartDate) return false;
+  const now = new Date();
+  const start = new Date(eventStartDate);
+  const diffMs = start - now;
+  return diffMs <= windowHours * 60 * 60 * 1000;
+};
+
 
 const normalizePrice = (amount, currency) => {
   if (amount === undefined) return {};
@@ -290,6 +300,19 @@ const update_schedule_event = async (req, res, next) => {
       }
     }
 
+    const previousStatus = existing.status;
+    const previousBillingStatus = existing.billingStatus;
+
+    if (updates?.status === "COMPLETED" && updates?.billingStatus === undefined) {
+      updates.billingStatus = "CHARGED";
+    }
+
+    if (updates?.status === "CANCELLED" && updates?.billingStatus === undefined) {
+      updates.billingStatus = isWithinCancellationWindow(existing.startDateTime)
+        ? "CHARGED"
+        : "NO_CHARGE";
+    }
+
     if (updates?.sessionTypeId !== undefined) {
       const requestedId = updates.sessionTypeId || null;
       updates.sessionTypeId = requestedId
@@ -304,6 +327,49 @@ const update_schedule_event = async (req, res, next) => {
     }
     let updated = await ScheduleEvent.findByIdAndUpdate(_id, updates, { new: true });
     updated = await merge_open_availability(updated);
+
+    if (updated?.eventType === "APPOINTMENT" && updated.clientId) {
+      const updatedStatus = updated.status;
+      const updatedBillingStatus = updated.billingStatus;
+
+      const becameCompleted =
+        updatedStatus === "COMPLETED" &&
+        (previousStatus !== "COMPLETED" || previousBillingStatus !== updatedBillingStatus);
+      const becameCancelled =
+        updatedStatus === "CANCELLED" &&
+        (previousStatus !== "CANCELLED" || previousBillingStatus !== updatedBillingStatus);
+
+      const leftCompleted = previousStatus === "COMPLETED" && updatedStatus !== "COMPLETED";
+      const leftCancelled =
+        previousStatus === "CANCELLED" &&
+        previousBillingStatus === "CHARGED" &&
+        updatedStatus !== "CANCELLED";
+
+      if (becameCompleted && updatedBillingStatus === "CHARGED") {
+        await createEventDebitEntry({ event: updated, userId, source: "APPOINTMENT" });
+      }
+
+      if (becameCancelled && updatedBillingStatus === "CHARGED") {
+        await createEventDebitEntry({
+          event: updated,
+          userId,
+          source: "CANCELLATION_CHARGED",
+        });
+      }
+
+      if (updatedStatus === "CANCELLED" && updatedBillingStatus === "NO_CHARGE") {
+        await reverseEventDebitEntry({ event: updated, userId });
+      }
+
+      if (updatedStatus === "COMPLETED" && updatedBillingStatus === "NO_CHARGE") {
+        await reverseEventDebitEntry({ event: updated, userId });
+      }
+
+      if (leftCompleted || leftCancelled) {
+        await reverseEventDebitEntry({ event: updated, userId });
+      }
+    }
+
     return res.json({ event: updated });
   } catch (err) {
     return next(err);
@@ -313,7 +379,7 @@ const update_schedule_event = async (req, res, next) => {
 const cancel_schedule_event = async (req, res, next) => {
   try {
     const userId = res.locals.user._id;
-    const { _id } = req.body;
+    const { _id, billingStatus } = req.body;
 
     const existing = await ScheduleEvent.findById(_id);
     if (!existing) {
@@ -329,7 +395,27 @@ const cancel_schedule_event = async (req, res, next) => {
 
     existing.status = "CANCELLED";
     existing.cancelledBy = userId;
+    if (billingStatus && String(existing.trainerId) === String(userId)) {
+      existing.billingStatus = billingStatus;
+    } else {
+      existing.billingStatus = isWithinCancellationWindow(existing.startDateTime)
+        ? "CHARGED"
+        : "NO_CHARGE";
+    }
     const updated = await existing.save();
+
+    if (updated?.eventType === "APPOINTMENT" && updated.clientId) {
+      if (updated.billingStatus === "CHARGED") {
+        await createEventDebitEntry({
+          event: updated,
+          userId,
+          source: "CANCELLATION_CHARGED",
+        });
+      } else {
+        await reverseEventDebitEntry({ event: updated, userId });
+      }
+    }
+
     return res.json({ event: updated });
   } catch (err) {
     return next(err);
