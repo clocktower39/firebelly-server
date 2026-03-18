@@ -17,6 +17,8 @@ const trainingSchema = new mongoose.Schema(
     title: { type: String },
     date: { type: Date },
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    workoutType: { type: String, default: "Strength" },
+    cardio: { type: Object, default: () => ({}) },
     category: { type: Array, required: true },
     training: {
       type: [
