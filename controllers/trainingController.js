@@ -370,58 +370,52 @@ const get_exercise_history = (req, res, next) => {
 };
 
 const update_workout_date_by_id = async (req, res, next) => {
-  const updateWorkoutDate = async (training, newDate, newTitle) => {
-    try {
-      training.date = newDate;
-      training.title = newTitle;
-
-      training.training.forEach((set) => {
-        set.forEach((exercise) => {
-          exercise.exercise = exercise.exercise;
-        });
-      });
-
-      const updatedTraining = await training.save();
-      return updatedTraining;
-    } catch (error) {
-      throw error;
-    }
-  };
-
   try {
-    const training = await Training.findOne({ _id: req.body._id });
+    const { _id, newDate } = req.body;
+    const hasNewTitle = Object.prototype.hasOwnProperty.call(req.body, "newTitle");
+    const training = await Training.findById(_id).select("user");
 
     if (!training) {
       return res.status(404).json({ error: "Training not found." });
     }
 
     // Check if the user updating the data is the owner
-    if (training.user._id.toString() === res.locals.user._id) {
-      // Update the workout date
-      const updatedTraining = await updateWorkoutDate(
-        training,
-        req.body.newDate,
-        req.body.newTitle
-      );
-      return res.send(updatedTraining);
+    if (String(training.user) !== String(res.locals.user._id)) {
+      // If not the owner, check the relationship
+      const relationship = await checkClientRelationship(res.locals.user._id, training.user);
+
+      if (!relationship || !relationship.accepted) {
+        return res.status(403).json({ error: "Unauthorized access." });
+      }
     }
 
-    // If not the owner, check the relationship
-    const relationship = await checkClientRelationship(res.locals.user._id, training.user._id);
+    const update = {
+      date: newDate === "" ? null : newDate,
+    };
 
-    if (relationship && relationship.accepted) {
-      // If the relationship is accepted, update the workout date
-      const updatedTraining = await updateWorkoutDate(
-        training,
-        req.body.newDate,
-        req.body.newTitle
-      );
-      res.send(updatedTraining);
-    } else {
-      res.status(403).json({ error: "Unauthorized access." });
+    if (hasNewTitle) {
+      update.title = req.body.newTitle;
     }
+
+    const updatedTraining = await Training.findByIdAndUpdate(
+      _id,
+      { $set: update },
+      { new: true }
+    )
+      .populate({
+        path: "training.exercise",
+        model: "Exercise",
+        select: "_id exerciseTitle",
+      })
+      .populate({
+        path: "user workoutFeedback.comments.user workoutFeedback.comments.deletedBy training.feedback.comments.user training.feedback.comments.deletedBy",
+        model: "User",
+        select: "_id firstName lastName profilePicture",
+      });
+
+    return res.send(updatedTraining);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
