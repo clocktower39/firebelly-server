@@ -96,7 +96,7 @@ const get_my_relationships = async (req, res, next) => {
 
 const get_my_clients = async (req, res, next) => {
   const clients = await Relationship.find({ trainer: res.locals.user._id })
-    .populate("client", "firstName lastName profilePicture")
+    .populate("client", "firstName lastName profilePicture weeklyFrequency preferredWorkoutDays")
     .exec();
   res.send(clients);
 };
