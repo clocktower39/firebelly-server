@@ -7,6 +7,20 @@ const relationshipSchema = new mongoose.Schema(
     requestedBy: { type: String, required: true },
     accepted: { type: Boolean, required: true },
     metricsApprovalRequired: { type: Boolean, default: true },
+    engagementStatus: {
+      type: String,
+      enum: ["active", "paused", "inactive"],
+      default: "active",
+    },
+    serviceTags: {
+      type: [
+        {
+          type: String,
+          enum: ["in_person", "online", "programming"],
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

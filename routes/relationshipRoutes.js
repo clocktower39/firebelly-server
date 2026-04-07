@@ -29,6 +29,17 @@ const metricsApprovalStatus = {
     }),
 }
 
+const relationshipProfile = {
+    body: Joi.object({
+        client: Joi.string()
+            .required(),
+        engagementStatus: Joi.string().valid("active", "paused", "inactive"),
+        serviceTags: Joi.array().items(
+            Joi.string().valid("in_person", "online", "programming")
+        ),
+    }).or("engagementStatus", "serviceTags"),
+}
+
 const clientViewTokenValidate = {
     body: Joi.object({
         clientId: Joi.string().required(),
@@ -44,6 +55,7 @@ router.post('/changeRelationshipStatus', validate(relationshipStatus, {}, {}), v
 router.post('/manageRelationship', validate(relationshipValidate, {}, {}), verifyAccessToken, ensureWriteAccess, relationshipController.manage_relationship);
 router.post('/removeRelationship', verifyAccessToken, ensureWriteAccess, relationshipController.remove_relationship);
 router.post('/relationships/metricsApproval', validate(metricsApprovalStatus, {}, {}), verifyAccessToken, ensureWriteAccess, relationshipController.update_metrics_approval);
+router.post('/relationships/profile', validate(relationshipProfile, {}, {}), verifyAccessToken, ensureWriteAccess, relationshipController.update_relationship_profile);
 router.post(
   '/relationships/client/token',
   validate(clientViewTokenValidate, {}, {}),
