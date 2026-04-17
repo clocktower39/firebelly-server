@@ -4,6 +4,9 @@ const userController = require("./userController");
 const mongoose = require("mongoose");
 const { createAccessToken } = require("../services/tokenService");
 
+const normalizeServiceTags = (serviceTags = []) =>
+  Array.from(new Set((Array.isArray(serviceTags) ? serviceTags : []).filter(Boolean)));
+
 const manage_relationship = (req, res, next) => {
   req.body.client = res.locals.user._id;
   req.body.accepted = false;
@@ -88,6 +91,8 @@ const get_my_relationships = async (req, res, next) => {
       profilePicture: t.profilePicture,
       accepted: relationship?.accepted ?? false,
       metricsApprovalRequired: relationship?.metricsApprovalRequired ?? true,
+      engagementStatus: relationship?.engagementStatus || "active",
+      serviceTags: normalizeServiceTags(relationship?.serviceTags),
       lastActivityAt,
     };
   });
@@ -126,6 +131,30 @@ const update_metrics_approval = (req, res, next) => {
   Relationship.findOneAndUpdate(
     { trainer, client: res.locals.user._id },
     { metricsApprovalRequired },
+    { new: true }
+  )
+    .then((data) => {
+      if (!data) return res.status(404).send({ message: "Relationship not found." });
+      res.send({ status: "success", relationship: data });
+    })
+    .catch((err) => next(err));
+};
+
+const update_relationship_profile = (req, res, next) => {
+  const { client, engagementStatus, serviceTags } = req.body;
+  const updates = {};
+
+  if (engagementStatus) {
+    updates.engagementStatus = engagementStatus;
+  }
+
+  if (serviceTags) {
+    updates.serviceTags = normalizeServiceTags(serviceTags);
+  }
+
+  Relationship.findOneAndUpdate(
+    { trainer: res.locals.user._id, client },
+    updates,
     { new: true }
   )
     .then((data) => {
@@ -183,5 +212,6 @@ module.exports = {
   get_my_clients,
   remove_relationship,
   update_metrics_approval,
+  update_relationship_profile,
   issue_client_view_token,
 };
