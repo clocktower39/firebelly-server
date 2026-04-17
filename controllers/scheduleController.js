@@ -6,6 +6,7 @@ const SessionType = require("../models/sessionType");
 const { createEventDebitEntry, reverseEventDebitEntry } = require("../services/billingLedgerService");
 
 const APPOINTMENT_STATUSES = ["REQUESTED", "BOOKED", "COMPLETED"];
+const BOOKING_INTERVAL_MINUTES = 15;
 
 const ensureRelationship = async (trainerId, clientId) => {
   if (!trainerId || !clientId) return null;
@@ -18,6 +19,15 @@ const isWithinCancellationWindow = (eventStartDate, windowHours = 24) => {
   const start = new Date(eventStartDate);
   const diffMs = start - now;
   return diffMs <= windowHours * 60 * 60 * 1000;
+};
+
+const isOnBookingInterval = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false;
+  return (
+    date.getSeconds() === 0 &&
+    date.getMilliseconds() === 0 &&
+    date.getMinutes() % BOOKING_INTERVAL_MINUTES === 0
+  );
 };
 
 
@@ -459,6 +469,14 @@ const request_booking = async (req, res, next) => {
     const requestedStart = new Date(startDateTime);
     const requestedEnd = new Date(endDateTime);
 
+    if (requestedEnd <= requestedStart) {
+      return res.status(400).json({ error: "End time must be after start time." });
+    }
+
+    if (!isOnBookingInterval(requestedStart) || !isOnBookingInterval(requestedEnd)) {
+      return res.status(400).json({ error: "Bookings must start and end on 15-minute intervals." });
+    }
+
     if (requestedStart < availabilityStart || requestedEnd > availabilityEnd) {
       return res.status(400).json({ error: "Requested time is outside availability range." });
     }
@@ -580,6 +598,14 @@ const trainer_book_availability = async (req, res, next) => {
     const availabilityEnd = new Date(availability.endDateTime);
     const requestedStart = new Date(startDateTime);
     const requestedEnd = new Date(endDateTime);
+
+    if (requestedEnd <= requestedStart) {
+      return res.status(400).json({ error: "End time must be after start time." });
+    }
+
+    if (!isOnBookingInterval(requestedStart) || !isOnBookingInterval(requestedEnd)) {
+      return res.status(400).json({ error: "Bookings must start and end on 15-minute intervals." });
+    }
 
     if (requestedStart < availabilityStart || requestedEnd > availabilityEnd) {
       return res.status(400).json({ error: "Requested time is outside availability range." });
