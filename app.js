@@ -99,6 +99,16 @@ global.io.on("connection", (socket) => {
     console.log(`Socket ${socket.id} left workout room ${workoutId}`);
   });
 
+  socket.on("joinWorkoutAccount", ({ accountId }) => {
+    if (!accountId) return;
+    socket.join(`workouts:${accountId}`);
+  });
+
+  socket.on("leaveWorkoutAccount", ({ accountId }) => {
+    if (!accountId) return;
+    socket.leave(`workouts:${accountId}`);
+  });
+
   // When a client requests the current state, broadcast the request to all others in the room
   socket.on("requestCurrentState", ({ workoutId }) => {
     // Broadcast to everyone else in the room so that one of them can reply.
@@ -114,8 +124,13 @@ global.io.on("connection", (socket) => {
   });
 
   // Relay live updates to everyone except the sender.
-  socket.on("liveTrainingUpdate", ({ workoutId, updatedTraining }) => {
-    socket.to(workoutId).emit("liveTrainingUpdate", updatedTraining);
+  socket.on("liveTrainingUpdate", ({ workoutId, updatedTraining, workout, accountId }) => {
+    const payload = { workoutId, updatedTraining, workout, accountId };
+    socket.to(workoutId).emit("liveTrainingUpdate", payload);
+
+    if (workout?._id && accountId) {
+      socket.to(`workouts:${accountId}`).emit("workoutUpdated", payload);
+    }
   });
 
   // Listen for the 'requestClientStatuses' event and send the current status

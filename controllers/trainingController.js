@@ -49,7 +49,7 @@ const update_training = async (req, res, next) => {
     const training = await Training.findByIdAndUpdate(
       req.body._id,
       { ...req.body.training },
-      { new: true }
+      { returnDocument: "after" }
     )
       .populate({
         path: "training.exercise",
@@ -78,7 +78,7 @@ const update_training = async (req, res, next) => {
               updates.billingStatus = "CHARGED";
             }
             const updatedEvent = await ScheduleEvent.findByIdAndUpdate(event._id, updates, {
-              new: true,
+              returnDocument: "after",
             });
             if (updatedEvent?.billingStatus === "CHARGED") {
               await createEventDebitEntry({
@@ -93,13 +93,20 @@ const update_training = async (req, res, next) => {
             const updatedEvent = await ScheduleEvent.findByIdAndUpdate(
               event._id,
               { status: "BOOKED" },
-              { new: true }
+              { returnDocument: "after" }
             );
             await reverseEventDebitEntry({ event: updatedEvent, userId: res.locals.user._id });
           }
         }
       }
     }
+
+    const accountId = String(training.user?._id || training.user);
+    global.io?.to(`workouts:${accountId}`).emit("workoutUpdated", {
+      workoutId: String(training._id),
+      accountId,
+      workout: training,
+    });
 
     return res.send({ training });
   } catch (err) {
@@ -400,7 +407,7 @@ const update_workout_date_by_id = async (req, res, next) => {
     const updatedTraining = await Training.findByIdAndUpdate(
       _id,
       { $set: update },
-      { new: true }
+      { returnDocument: "after" }
     )
       .populate({
         path: "training.exercise",
@@ -1048,40 +1055,43 @@ const debug_training_by_ids = async (req, res, next) => {
   }
 };
 
-const delete_workout_by_id = (req, res, next) => {
-  const workoutId = req.body._id;
+const delete_workout_by_id = async (req, res, next) => {
+  try {
+    const workoutId = req.body._id;
+    const data = await Training.findOne({ _id: workoutId }).select("_id user").lean();
 
-  const performDeletion = (workoutId, res) => {
-    Training.findOneAndDelete({ _id: workoutId })
-      .then((data) => {
-        if (!data) {
-          return res.status(404).json({ error: "Training not found." });
-        }
-        res.send({ status: "Record deleted" });
-      })
-      .catch((err) => res.status(500).json({ error: err }));
-  };
+    if (!data) {
+      return res.status(404).json({ error: "Training not found." });
+    }
 
-  Training.findOne({ _id: workoutId })
-    .then((data) => {
-      if (!data) {
-        return res.status(404).json({ error: "Training not found." });
+    const accountId = String(data.user);
+    if (accountId !== String(res.locals.user._id)) {
+      const relationship = await Relationship.findOne({
+        trainer: res.locals.user._id,
+        client: accountId,
+        accepted: true,
+      });
+
+      if (!relationship) {
+        return res.status(403).json({ error: "Unauthorized access." });
       }
+    }
 
-      if (data.user._id.toString() === res.locals.user._id) {
-        performDeletion(workoutId, res);
-      } else {
-        Relationship.findOne({ trainer: res.locals.user._id, client: data.user._id })
-          .then((relationship) => {
-            if (!relationship || !relationship.accepted) {
-              return res.status(403).json({ error: "Unauthorized access." });
-            }
-            performDeletion(workoutId, res);
-          })
-          .catch((err) => next(err));
-      }
-    })
-    .catch((err) => res.status(500).json({ error: err }));
+    await Training.deleteOne({ _id: workoutId });
+
+    global.io?.to(`workouts:${accountId}`).emit("workoutDeleted", {
+      workoutId: String(workoutId),
+      accountId,
+    });
+
+    return res.send({
+      status: "Record deleted",
+      deletedId: String(workoutId),
+      accountId,
+    });
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const workout_history_request = async (req, res, next) => {
