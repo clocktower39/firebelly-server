@@ -7,6 +7,8 @@ const { createAccessToken } = require("../services/tokenService");
 const normalizeServiceTags = (serviceTags = []) =>
   Array.from(new Set((Array.isArray(serviceTags) ? serviceTags : []).filter(Boolean)));
 
+const isRealTrainerSession = (user) => Boolean(user?.isTrainer) && !user?.delegationMode;
+
 const manage_relationship = (req, res, next) => {
   req.body.client = res.locals.user._id;
   req.body.accepted = false;
@@ -100,6 +102,10 @@ const get_my_relationships = async (req, res, next) => {
 };
 
 const get_my_clients = async (req, res, next) => {
+  if (!isRealTrainerSession(res.locals.user)) {
+    return res.status(403).json({ error: "Only trainer accounts can view clients." });
+  }
+
   const clients = await Relationship.find({ trainer: res.locals.user._id })
     .populate("client", "firstName lastName profilePicture weeklyFrequency preferredWorkoutDays")
     .exec();
@@ -166,6 +172,10 @@ const update_relationship_profile = (req, res, next) => {
 
 const issue_client_view_token = async (req, res, next) => {
   try {
+    if (!isRealTrainerSession(res.locals.user)) {
+      return res.status(403).json({ error: "Only trainer accounts can enter client view." });
+    }
+
     const trainerId = res.locals.user._id;
     const { clientId } = req.body;
 
@@ -194,7 +204,15 @@ const issue_client_view_token = async (req, res, next) => {
 
     const accessToken = createAccessToken(
       client,
-      { trainerId },
+      {
+        trainerId,
+        isTrainer: false,
+        actingUserId: trainerId,
+        actingUserRole: "trainer",
+        delegationMode: "trainer_client",
+        canModifyViewedAccount: true,
+        viewedUserId: client._id,
+      },
       { expiresIn: "60m" }
     );
 

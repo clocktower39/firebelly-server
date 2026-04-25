@@ -3,6 +3,9 @@ const jwt = require("jsonwebtoken");
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
+const hasOverride = (overrides, key) =>
+  Object.prototype.hasOwnProperty.call(overrides, key);
+
 const buildTokenPayload = (user, overrides = {}) => ({
   _id: user._id,
   email: user.email || null,
@@ -19,7 +22,9 @@ const buildTokenPayload = (user, overrides = {}) => ({
   customThemes: user.customThemes || [],
   weeklyFrequency: user.weeklyFrequency || null,
   preferredWorkoutDays: user.preferredWorkoutDays || [],
-  isTrainer: Boolean(user.isTrainer),
+  isTrainer: hasOverride(overrides, "isTrainer")
+    ? Boolean(overrides.isTrainer)
+    : Boolean(user.isTrainer),
   accountType: user.accountType || "adult",
   ageBand: user.ageBand || null,
   coppaStatus: user.coppaStatus || null,
@@ -29,6 +34,11 @@ const buildTokenPayload = (user, overrides = {}) => ({
   viewOnly: Boolean(overrides.viewOnly),
   guardianId: overrides.guardianId || null,
   trainerId: overrides.trainerId || null,
+  actingUserId: overrides.actingUserId || null,
+  actingUserRole: overrides.actingUserRole || null,
+  delegationMode: overrides.delegationMode || null,
+  canModifyViewedAccount: Boolean(overrides.canModifyViewedAccount),
+  viewedUserId: overrides.viewedUserId || null,
 });
 
 const createTokens = (user, overrides = {}) => {
