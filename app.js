@@ -74,6 +74,39 @@ app.use("/", invoiceRoutes);
 app.use("/", productRoutes);
 
 const connectedClients = {};
+const pagePresenceBySocket = new Map();
+
+const getPagePresenceRoom = (pageKey) => `page:${pageKey}`;
+
+const normalizePresenceUser = (user = {}) => ({
+  userId: user.userId || null,
+  firstName: user.firstName || "",
+  lastName: user.lastName || "",
+  profilePicture: user.profilePicture || null,
+  role: user.role || "member",
+  delegationMode: user.delegationMode || null,
+});
+
+const getPagePresenceUsers = (pageKey) => {
+  const users = [];
+  pagePresenceBySocket.forEach((presence, socketId) => {
+    if (presence.pageKey === pageKey) {
+      users.push({
+        ...presence.user,
+        socketId,
+      });
+    }
+  });
+  return users;
+};
+
+const emitPagePresence = (pageKey) => {
+  if (!pageKey) return;
+  global.io.to(getPagePresenceRoom(pageKey)).emit("pagePresence", {
+    pageKey,
+    users: getPagePresenceUsers(pageKey),
+  });
+};
 
 global.io.on("connection", (socket) => {
   const userId = socket.handshake.query.userId;
@@ -107,6 +140,34 @@ global.io.on("connection", (socket) => {
   socket.on("leaveWorkoutAccount", ({ accountId }) => {
     if (!accountId) return;
     socket.leave(`workouts:${accountId}`);
+  });
+
+  socket.on("joinPagePresence", ({ pageKey, user }) => {
+    if (!pageKey) return;
+
+    const previousPresence = pagePresenceBySocket.get(socket.id);
+    if (previousPresence?.pageKey && previousPresence.pageKey !== pageKey) {
+      socket.leave(getPagePresenceRoom(previousPresence.pageKey));
+      pagePresenceBySocket.delete(socket.id);
+      emitPagePresence(previousPresence.pageKey);
+    }
+
+    socket.join(getPagePresenceRoom(pageKey));
+    pagePresenceBySocket.set(socket.id, {
+      pageKey,
+      user: normalizePresenceUser(user),
+    });
+    emitPagePresence(pageKey);
+  });
+
+  socket.on("leavePagePresence", ({ pageKey }) => {
+    const activePresence = pagePresenceBySocket.get(socket.id);
+    const activePageKey = pageKey || activePresence?.pageKey;
+    if (!activePageKey) return;
+
+    socket.leave(getPagePresenceRoom(activePageKey));
+    pagePresenceBySocket.delete(socket.id);
+    emitPagePresence(activePageKey);
   });
 
   // When a client requests the current state, broadcast the request to all others in the room
@@ -143,6 +204,12 @@ global.io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    const activePresence = pagePresenceBySocket.get(socket.id);
+    if (activePresence?.pageKey) {
+      pagePresenceBySocket.delete(socket.id);
+      emitPagePresence(activePresence.pageKey);
+    }
+
     // Remove the client from the connectedClients object
     delete connectedClients[userId];
 
