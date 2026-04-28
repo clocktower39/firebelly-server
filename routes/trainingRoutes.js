@@ -10,6 +10,7 @@ router.post('/updateTraining', verifyAccessToken, ensureWriteAccess, trainingCon
 router.post('/createTraining', verifyAccessToken, ensureWriteAccess, trainingController.create_training);
 router.post('/trainingWeek', verifyAccessToken, trainingController.get_weekly_training);
 router.post('/exerciseHistory', verifyAccessToken, trainingController.get_exercise_history);
+router.post('/exerciseProgressSummary', verifyAccessToken, trainingController.get_exercise_progress_summary);
 router.post('/myExerciseList', verifyAccessToken, trainingController.get_exercise_list);
 router.post('/copyWorkoutById', verifyAccessToken, ensureWriteAccess, trainingController.copy_workout_by_id);
 router.post('/updateWorkoutDateById', verifyAccessToken, ensureWriteAccess, trainingController.update_workout_date_by_id);

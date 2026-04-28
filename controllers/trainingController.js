@@ -376,6 +376,84 @@ const get_exercise_history = (req, res, next) => {
     .catch((err) => next(err));
 };
 
+const get_exercise_progress_summary = async (req, res, next) => {
+  try {
+    const { user } = req.body;
+    const targetUserId = typeof user === "object" ? user?._id : user;
+
+    if (!targetUserId || !mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ error: "A valid user is required." });
+    }
+
+    const relationship = await checkClientRelationship(res.locals.user._id, targetUserId);
+    const canView = String(res.locals.user._id) === String(targetUserId) || relationship?.accepted;
+
+    if (!canView) {
+      return res.status(403).json({ error: "Restricted" });
+    }
+
+    const workouts = await Training.find({ user: targetUserId })
+      .select("date training")
+      .populate({
+        path: "training.exercise",
+        select: "_id exerciseTitle",
+      })
+      .lean();
+
+    const summariesByExercise = new Map();
+
+    workouts.forEach((workout) => {
+      const workoutDate = workout.date;
+      workout.training?.forEach((set) => {
+        set?.forEach((item) => {
+          const exercise = item.exercise;
+          const exerciseId = exercise?._id ? String(exercise._id) : String(exercise || "");
+          if (!exerciseId || exerciseId === "null" || exerciseId === "undefined") return;
+
+          const exerciseTitle = exercise?.exerciseTitle || item.exerciseTitle || "Exercise";
+          const existing =
+            summariesByExercise.get(exerciseId) || {
+              exercise: { _id: exerciseId, exerciseTitle },
+              entryCount: 0,
+              latestDate: null,
+              historyPreview: [],
+            };
+
+          const dateValue = workoutDate ? dayjs.utc(workoutDate).valueOf() : 0;
+          const latestValue = existing.latestDate ? dayjs.utc(existing.latestDate).valueOf() : 0;
+
+          existing.entryCount += 1;
+          existing.exercise.exerciseTitle = exerciseTitle;
+          if (dateValue >= latestValue) {
+            existing.latestDate = workoutDate;
+          }
+          existing.historyPreview.push({
+            date: workoutDate,
+            exerciseType: item.exerciseType,
+            achieved: item.achieved,
+          });
+
+          summariesByExercise.set(exerciseId, existing);
+        });
+      });
+    });
+
+    const summaries = Array.from(summariesByExercise.values())
+      .map((summary) => ({
+        ...summary,
+        historyPreview: summary.historyPreview
+          .filter((entry) => entry.date)
+          .sort((a, b) => dayjs.utc(a.date).valueOf() - dayjs.utc(b.date).valueOf())
+          .slice(-12),
+      }))
+      .sort((a, b) => dayjs.utc(b.latestDate).valueOf() - dayjs.utc(a.latestDate).valueOf());
+
+    return res.send(summaries);
+  } catch (err) {
+    return next(err);
+  }
+};
+
 const update_workout_date_by_id = async (req, res, next) => {
   try {
     const { _id, newDate } = req.body;
@@ -1311,6 +1389,7 @@ module.exports = {
   get_weekly_training,
   get_exercise_list,
   get_exercise_history,
+  get_exercise_progress_summary,
   copy_workout_by_id,
   delete_workout_by_id,
   workout_history_request,
