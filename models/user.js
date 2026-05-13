@@ -49,6 +49,7 @@ const UserSchema = new mongoose.Schema({
         ref: "profilePictures.files"
     },
     themeMode: { type: String, required: true, default: 'light', },
+    workoutWeightUnit: { type: String, enum: ['lbs', 'kg'], default: 'lbs' },
     customThemes: {
         type: [
             {

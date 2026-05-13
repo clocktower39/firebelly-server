@@ -19,6 +19,7 @@ const buildTokenPayload = (user, overrides = {}) => ({
   gymBarcode: user.gymBarcode || null,
   profilePicture: user.profilePicture || null,
   themeMode: user.themeMode || "light",
+  workoutWeightUnit: user.workoutWeightUnit === "kg" ? "kg" : "lbs",
   customThemes: user.customThemes || [],
   weeklyFrequency: user.weeklyFrequency || null,
   preferredWorkoutDays: user.preferredWorkoutDays || [],
