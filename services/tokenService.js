@@ -1,7 +1,6 @@
 const jwt = require("jsonwebtoken");
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
 const hasOverride = (overrides, key) =>
   Object.prototype.hasOwnProperty.call(overrides, key);
@@ -42,20 +41,6 @@ const buildTokenPayload = (user, overrides = {}) => ({
   viewedUserId: overrides.viewedUserId || null,
 });
 
-const createTokens = (user, overrides = {}) => {
-  const payload = buildTokenPayload(user, overrides);
-
-  const accessToken = jwt.sign(payload, ACCESS_TOKEN_SECRET, {
-    expiresIn: "180m",
-  });
-
-  const refreshToken = jwt.sign(payload, REFRESH_TOKEN_SECRET, {
-    expiresIn: "90d",
-  });
-
-  return { accessToken, refreshToken };
-};
-
 const createAccessToken = (user, overrides = {}, options = {}) => {
   const payload = buildTokenPayload(user, overrides);
   return jwt.sign(payload, ACCESS_TOKEN_SECRET, {
@@ -65,6 +50,5 @@ const createAccessToken = (user, overrides = {}, options = {}) => {
 
 module.exports = {
   buildTokenPayload,
-  createTokens,
   createAccessToken,
 };

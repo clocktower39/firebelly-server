@@ -1,9 +1,16 @@
 const Conversation = require("../models/conversation");
 
-const create_conversation = (req, res) => {
-  const userList = [...req.body.users, res.locals.user._id];
+const create_conversation = (req, res, next) => {
+  const requestedUsers = Array.isArray(req.body.users) ? req.body.users : [];
+  const userList = Array.from(
+    new Set([...requestedUsers.map((userId) => String(userId)), String(res.locals.user._id)])
+  );
 
-  Conversation.find({ users: userList })
+  if (userList.length < 2) {
+    return res.status(400).send({ error: "At least one other user is required." });
+  }
+
+  Conversation.find({ users: { $all: userList, $size: userList.length } })
     .then((conversations) => {
       if (conversations.length > 0) {
         res.send({ error: "Conversation between these users already exists." });
@@ -36,7 +43,7 @@ const get_conversations = async (req, res, next) => {
   res.send(conversations);
 };
 
-const send_message = async (req, res) => {
+const send_message = async (req, res, next) => {
   const newMessage = {
     user: res.locals.user._id,
     message: req.body.message,
@@ -57,7 +64,7 @@ const send_message = async (req, res) => {
     });
 };
 
-const delete_message = async (req, res) => {
+const delete_message = async (req, res, next) => {
   Conversation.findOneAndUpdate(
     { _id: req.body.conversationId, users: res.locals.user._id },
     { $pull: { messages: { _id: req.body.messageId, user: res.locals.user._id } } },

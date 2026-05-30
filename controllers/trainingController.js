@@ -7,8 +7,23 @@ const dayjs = require("dayjs");
 const utc = require("dayjs/plugin/utc");
 const Exercise = require("../models/exercise");
 const User = require("../models/user");
+const { canWriteUserResource } = require("../services/accessControl");
+const { pick } = require("../utils/object");
 
 dayjs.extend(utc);
+
+const TRAINING_UPDATE_FIELDS = [
+  "title",
+  "date",
+  "workoutType",
+  "cardio",
+  "category",
+  "training",
+  "workoutFeedback",
+  "queuePosition",
+  "isTemplate",
+  "complete",
+];
 
 const create_training = async (req, res, next) => {
   try {
@@ -46,9 +61,19 @@ const create_training = async (req, res, next) => {
 const update_training = async (req, res, next) => {
   try {
     const existing = await Training.findById(req.body._id).lean();
+    if (!existing) {
+      return res.status(404).json({ error: "Training not found." });
+    }
+
+    const canWrite = await canWriteUserResource(res.locals.user, existing.user);
+    if (!canWrite) {
+      return res.status(403).json({ error: "Unauthorized access." });
+    }
+
+    const updates = pick(req.body.training, TRAINING_UPDATE_FIELDS);
     const training = await Training.findByIdAndUpdate(
       req.body._id,
-      { ...req.body.training },
+      { $set: updates },
       { returnDocument: "after" }
     )
       .populate({
@@ -66,37 +91,35 @@ const update_training = async (req, res, next) => {
       return res.status(404).json({ error: "Training not found." });
     }
 
-    if (existing) {
-      const wasComplete = !!existing.complete;
-      const isComplete = !!training.complete;
-      if (wasComplete !== isComplete) {
-        const event = await ScheduleEvent.findOne({ workoutId: training._id });
-        if (event && event.eventType === "APPOINTMENT" && event.status !== "CANCELLED") {
-          if (isComplete) {
-            const updates = { status: "COMPLETED" };
-            if (!event.billingStatus || event.billingStatus === "UNBILLED") {
-              updates.billingStatus = "CHARGED";
-            }
-            const updatedEvent = await ScheduleEvent.findByIdAndUpdate(event._id, updates, {
-              returnDocument: "after",
+    const wasComplete = !!existing.complete;
+    const isComplete = !!training.complete;
+    if (wasComplete !== isComplete) {
+      const event = await ScheduleEvent.findOne({ workoutId: training._id });
+      if (event && event.eventType === "APPOINTMENT" && event.status !== "CANCELLED") {
+        if (isComplete) {
+          const eventUpdates = { status: "COMPLETED" };
+          if (!event.billingStatus || event.billingStatus === "UNBILLED") {
+            eventUpdates.billingStatus = "CHARGED";
+          }
+          const updatedEvent = await ScheduleEvent.findByIdAndUpdate(event._id, eventUpdates, {
+            returnDocument: "after",
+          });
+          if (updatedEvent?.billingStatus === "CHARGED") {
+            await createEventDebitEntry({
+              event: updatedEvent,
+              userId: res.locals.user._id,
+              source: "APPOINTMENT",
             });
-            if (updatedEvent?.billingStatus === "CHARGED") {
-              await createEventDebitEntry({
-                event: updatedEvent,
-                userId: res.locals.user._id,
-                source: "APPOINTMENT",
-              });
-            } else {
-              await reverseEventDebitEntry({ event: updatedEvent, userId: res.locals.user._id });
-            }
-          } else if (event.status === "COMPLETED") {
-            const updatedEvent = await ScheduleEvent.findByIdAndUpdate(
-              event._id,
-              { status: "BOOKED" },
-              { returnDocument: "after" }
-            );
+          } else {
             await reverseEventDebitEntry({ event: updatedEvent, userId: res.locals.user._id });
           }
+        } else if (event.status === "COMPLETED") {
+          const updatedEvent = await ScheduleEvent.findByIdAndUpdate(
+            event._id,
+            { status: "BOOKED" },
+            { returnDocument: "after" }
+          );
+          await reverseEventDebitEntry({ event: updatedEvent, userId: res.locals.user._id });
         }
       }
     }

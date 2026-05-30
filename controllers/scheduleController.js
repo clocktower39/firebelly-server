@@ -4,9 +4,31 @@ const User = require("../models/user");
 const Relationship = require("../models/relationship");
 const SessionType = require("../models/sessionType");
 const { createEventDebitEntry, reverseEventDebitEntry } = require("../services/billingLedgerService");
+const { pick } = require("../utils/object");
 
 const APPOINTMENT_STATUSES = ["REQUESTED", "BOOKED", "COMPLETED"];
 const BOOKING_INTERVAL_MINUTES = 15;
+const SCHEDULE_EVENT_UPDATE_FIELDS = [
+  "clientId",
+  "startDateTime",
+  "endDateTime",
+  "status",
+  "workoutId",
+  "customClientName",
+  "customClientEmail",
+  "customClientPhone",
+  "publicLabel",
+  "priceAmount",
+  "priceCurrency",
+  "payoutAmount",
+  "payoutCurrency",
+  "recurrenceRule",
+  "availabilitySource",
+  "billingStatus",
+  "notes",
+  "sessionTypeId",
+];
+const SCHEDULE_EVENT_CREATE_FIELDS = [...SCHEDULE_EVENT_UPDATE_FIELDS, "eventType"];
 
 const ensureRelationship = async (trainerId, clientId) => {
   if (!trainerId || !clientId) return null;
@@ -257,7 +279,7 @@ const get_public_schedule_range = async (req, res, next) => {
 const create_schedule_event = async (req, res, next) => {
   try {
     const userId = res.locals.user._id;
-    const payload = { ...req.body, trainerId: userId };
+    const payload = { ...pick(req.body, SCHEDULE_EVENT_CREATE_FIELDS), trainerId: userId };
 
     if (req.body.trainerId && String(req.body.trainerId) !== String(userId)) {
       return res.status(403).json({ error: "Unauthorized access." });
@@ -292,7 +314,8 @@ const create_schedule_event = async (req, res, next) => {
 const update_schedule_event = async (req, res, next) => {
   try {
     const userId = res.locals.user._id;
-    const { _id, updates } = req.body;
+    const { _id } = req.body;
+    const updates = pick(req.body.updates, SCHEDULE_EVENT_UPDATE_FIELDS);
 
     const existing = await ScheduleEvent.findById(_id);
     if (!existing) {
@@ -335,7 +358,7 @@ const update_schedule_event = async (req, res, next) => {
     if (updates?.payoutAmount !== undefined || updates?.payoutCurrency !== undefined) {
       Object.assign(updates, normalizePayout(updates.payoutAmount, updates.payoutCurrency));
     }
-    let updated = await ScheduleEvent.findByIdAndUpdate(_id, updates, { new: true });
+    let updated = await ScheduleEvent.findByIdAndUpdate(_id, { $set: updates }, { new: true });
     updated = await merge_open_availability(updated);
 
     if (updated?.eventType === "APPOINTMENT" && updated.clientId) {

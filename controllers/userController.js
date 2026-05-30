@@ -4,11 +4,30 @@ const ScheduleEvent = require("../models/scheduleEvent");
 const mongoose = require("mongoose");
 const crypto = require('crypto');
 const path = require('path');
-const { verifyRefreshToken } = require("../middleware/auth");
 const { sendEmail } = require("../services/emailService")
-const { createTokens } = require("../services/tokenService");
+const { createAccessToken } = require("../services/tokenService");
+const {
+  issueRefreshToken,
+  revokeRefreshTokenFromRequest,
+  rotateRefreshToken,
+} = require("../services/refreshTokenService");
 const { getAgeBand } = require("../utils/age");
-const { ensureDefaultSessionTypes } = require("./sessionTypeController");
+const { pick } = require("../utils/object");
+
+const USER_PROFILE_UPDATE_FIELDS = [
+  "firstName",
+  "lastName",
+  "phoneNumber",
+  "dateOfBirth",
+  "height",
+  "sex",
+  "gymBarcode",
+  "themeMode",
+  "workoutWeightUnit",
+  "customThemes",
+  "weeklyFrequency",
+  "preferredWorkoutDays",
+];
 
 const signup_user = async (req, res, next) => {
   try {
@@ -104,13 +123,13 @@ const verify_email = async (req, res, next) => {
     await user.save();
 
     // Optionally, generate tokens to log the user in
-    const tokens = createTokens(user);
+    const accessToken = createAccessToken(user);
+    await issueRefreshToken({ user, req, res });
 
     res.status(200).json({
       status: "success",
       message: "Email verified successfully.",
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
+      accessToken,
     });
   } catch (err) {
     next(err);
@@ -169,39 +188,38 @@ const resend_verification_email = async (req, res, next) => {
   }
 };
 
-const login_user = (req, res, next) => {
-  User.findOne({ email: req.body.email })
-    .then((user) => {
-      if (!user) {
-        res.send({
-          authenticated: false,
-          error: { email: "Username not found" },
-        });
-      } else {
-        if (!user.verified.isVerified) {
-          return res.status(400).json({
-            authenticated: false,
-            error: { email: "Please verify your email before logging in." },
-          });
-        }
-        user.comparePassword(req.body.password)
-          .then((isMatch) => {
-            if (isMatch) {
-              const tokens = createTokens(user);
-              res.send({
-                accessToken: tokens.accessToken,
-                refreshToken: tokens.refreshToken,
-              });
-            } else {
-              res.send({
-                error: { password: "Incorrect Password" },
-              });
-            }
-          })
-          .catch(() => res.send({ authenticated: false }));
-      }
-    })
-    .catch((err) => next(err));
+const login_user = async (req, res, next) => {
+  try {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) {
+      return res.status(401).send({
+        authenticated: false,
+        error: { email: "Invalid email or password." },
+      });
+    }
+
+    if (!user.verified.isVerified) {
+      return res.status(400).json({
+        authenticated: false,
+        error: { email: "Please verify your email before logging in." },
+      });
+    }
+
+    const isMatch = await user.comparePassword(req.body.password);
+    if (!isMatch) {
+      return res.status(401).send({
+        authenticated: false,
+        error: { password: "Invalid email or password." },
+      });
+    }
+
+    await issueRefreshToken({ user, req, res });
+    return res.send({
+      accessToken: createAccessToken(user),
+    });
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const login_child = async (req, res, next) => {
@@ -235,34 +253,31 @@ const login_child = async (req, res, next) => {
       return res.status(400).json({ error: { pin: "Incorrect PIN." } });
     }
 
-    const tokens = createTokens(user);
+    await issueRefreshToken({ user, req, res });
     res.send({
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
+      accessToken: createAccessToken(user),
     });
   } catch (err) {
     next(err);
   }
 };
 
-const refresh_tokens = (req, res, next) => {
-  const { refreshToken } = req.body;
+const refresh_tokens = async (req, res, next) => {
+  try {
+    const { accessToken } = await rotateRefreshToken({ req, res });
+    return res.send({ accessToken });
+  } catch (err) {
+    return res.status(err.statusCode || 403).send({ error: err.message || "Invalid refresh token" });
+  }
+};
 
-  verifyRefreshToken(refreshToken)
-    .then((verifiedRefreshToken) => {
-      return User.findById(verifiedRefreshToken._id).exec();
-    })
-    .then((user) => {
-      if (!user) {
-        return res.status(404).send({ error: "User not found" });
-      }
-
-      const tokens = createTokens(user);
-      res.send({
-        accessToken: tokens.accessToken,
-      });
-    })
-    .catch((err) => res.status(403).send({ error: "Invalid refresh token", err }));
+const logout_user = async (req, res, next) => {
+  try {
+    await revokeRefreshTokenFromRequest({ req, res });
+    return res.sendStatus(204);
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const change_password = (req, res, next) => {
@@ -276,12 +291,13 @@ const change_password = (req, res, next) => {
         return user.comparePassword(req.body.currentPassword).then((isMatch) => {
           if (isMatch) {
             user.password = req.body.newPassword;
-            return user.save().then((savedUser) => {
-              const tokens = createTokens(savedUser);
+            return user.save().then(async (savedUser) => {
+              await revokeRefreshTokenFromRequest({ req, res });
+              await issueRefreshToken({ user: savedUser, req, res });
+              const accessToken = createAccessToken(savedUser);
               res.send({
                 status: "success",
-                user: savedUser,
-                accessToken: tokens.accessToken,
+                accessToken,
               });
             });
           } else {
@@ -322,13 +338,25 @@ const update_user = async (req, res, next) => {
       });
     }
 
-    const requestedTrainer =
-      req.body?.isTrainer === true || req.body?.isTrainer === "true";
-    const becomingTrainer = !existing.isTrainer && requestedTrainer;
+    const updates = pick(req.body, USER_PROFILE_UPDATE_FIELDS);
+    if (updates.dateOfBirth) {
+      const ageBand = getAgeBand(updates.dateOfBirth);
+      if (ageBand === "u13") {
+        return res.status(400).json({
+          error: {
+            dateOfBirth:
+              "Users under 13 must have a parent or guardian create their account.",
+          },
+        });
+      }
+      updates.dateOfBirth = new Date(updates.dateOfBirth);
+      updates.ageBand = ageBand || "18_plus";
+      updates.accountType = ageBand && ageBand !== "18_plus" ? "teen" : "adult";
+    }
 
     const user = await User.findByIdAndUpdate(
       res.locals.user._id,
-      { ...req.body },
+      { $set: updates },
       { new: true }
     );
 
@@ -339,15 +367,11 @@ const update_user = async (req, res, next) => {
       });
     }
 
-    if (becomingTrainer) {
-      await ensureDefaultSessionTypes(user._id);
-    }
-
-    const tokens = createTokens(user);
+    const accessToken = createAccessToken(user);
     return res.send({
       status: "success",
       user,
-      accessToken: tokens.accessToken,
+      accessToken,
     });
   } catch (err) {
     return next(err);
@@ -463,10 +487,10 @@ const upload_profile_picture = async (req, res) => {
       // Save the new file ID to the user profile
       user.profilePicture = new mongoose.Types.ObjectId(uploadStream.id);
       const savedUser = await user.save();
-      const tokens = createTokens(savedUser);
+      const accessToken = createAccessToken(savedUser);
 
       res.status(200).json({
-        accessToken: tokens.accessToken,
+        accessToken,
       });
     });
 
@@ -544,4 +568,5 @@ module.exports = {
   get_profile_picture,
   delete_profile_picture,
   refresh_tokens,
+  logout_user,
 };

@@ -2,6 +2,29 @@ const Goal = require("../models/goal");
 const Relationship = require("../models/relationship");
 const Training = require("../models/training");
 const mongoose = require("mongoose");
+const { sameId } = require("../services/accessControl");
+const { pick } = require("../utils/object");
+
+const GOAL_FIELDS = [
+  "title",
+  "description",
+  "category",
+  "exercise",
+  "targetWeight",
+  "targetReps",
+  "achievedDate",
+  "targetDate",
+  "distanceUnit",
+  "distanceValue",
+  "goalTime",
+  "goalWeight",
+];
+
+const canAccessGoal = async (user, goalUserId) => {
+  if (sameId(user?._id, goalUserId)) return true;
+  if (!user?.isTrainer) return false;
+  return Boolean(await Relationship.findOne({ trainer: user._id, client: goalUserId, accepted: true }));
+};
 
 // Helper function to check if a strength goal has been achieved
 const checkStrengthGoalAchievement = async (userId, exerciseId, targetReps, targetWeight) => {
@@ -43,7 +66,7 @@ const checkStrengthGoalAchievement = async (userId, exerciseId, targetReps, targ
 
 const create_goal = (req, res, next) => {
   let goal = new Goal({
-    ...req.body,
+    ...pick(req.body, GOAL_FIELDS),
     createdDate: new Date(),
     user: res.locals.user._id,
   });
@@ -71,37 +94,9 @@ const remove_goal = (req, res, next) => {
 };
 
 const update_goal = (req, res, next) => {
-  const {
-    title,
-    description,
-    category,
-    exercise,
-    targetWeight,
-    targetReps,
-    achievedDate,
-    targetDate,
-    distanceUnit,
-    distanceValue,
-    goalTime,
-    goalWeight,
-  } = req.body;
-
-  Goal.findByIdAndUpdate(
-    req.body._id,
-    {
-      title,
-      description,
-      category,
-      exercise,
-      targetWeight,
-      targetReps,
-      achievedDate,
-      targetDate,
-      distanceUnit,
-      distanceValue,
-      goalTime,
-      goalWeight,
-    },
+  Goal.findOneAndUpdate(
+    { _id: req.body._id, user: res.locals.user._id },
+    { $set: pick(req.body, GOAL_FIELDS) },
     { new: true }
   )
     .populate("exercise", "_id exerciseTitle")
@@ -114,29 +109,34 @@ const update_goal = (req, res, next) => {
     .catch((err) => next(err));
 };
 
-const comment_on_goal = (req, res, next) => {
-  const { comment } = req.body;
-  Goal.findById(req.body._id)
-    .then((goal) => {
-      if (!goal) {
-        return res.status(404).send({ error: "Goal not found" });
-      }
-      const newComment = {
-        createdDate: new Date(),
-        comment,
-        user: res.locals.user._id,
-      };
-      goal.comments ? goal.comments.push(newComment) : (goal.comments = [newComment]);
+const comment_on_goal = async (req, res, next) => {
+  try {
+    const { comment } = req.body;
+    const goal = await Goal.findById(req.body._id);
+    if (!goal) {
+      return res.status(404).send({ error: "Goal not found" });
+    }
 
-      return goal.save();
-    })
-    .then((savedGoal) =>
-      Goal.findById(savedGoal._id).populate("comments.user", "firstName lastName profilePicture")
-    )
-    .then((populatedGoal) => {
-      res.send(populatedGoal);
-    })
-    .catch((err) => next(err));
+    const canAccess = await canAccessGoal(res.locals.user, goal.user);
+    if (!canAccess) {
+      return res.status(403).send({ error: "Not authorized to comment on this goal" });
+    }
+
+    const newComment = {
+      createdDate: new Date(),
+      comment,
+      user: res.locals.user._id,
+    };
+    goal.comments ? goal.comments.push(newComment) : (goal.comments = [newComment]);
+    const savedGoal = await goal.save();
+    const populatedGoal = await Goal.findById(savedGoal._id).populate(
+      "comments.user",
+      "firstName lastName profilePicture"
+    );
+    return res.send(populatedGoal);
+  } catch (err) {
+    return next(err);
+  }
 };
 
 const remove_comment = (req, res, next) => {

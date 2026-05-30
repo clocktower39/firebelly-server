@@ -1,6 +1,6 @@
 const express = require('express');
 const exerciseController = require('../controllers/exerciseController');
-const { verifyAccessToken, verifyRefreshToken } = require("../middleware/auth");
+const { verifyAccessToken } = require("../middleware/auth");
 const { ensureWriteAccess } = require("../middleware/ensureWriteAccess");
 
 const router = express.Router();

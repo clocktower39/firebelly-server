@@ -1,8 +1,29 @@
 const mongoose = require("mongoose");
 const Exercise = require("../models/exercise");
 const Training = require("../models/training");
+const { pick } = require("../utils/object");
 
-const exerciseAdminIds = ["612198502f4d5273b466b4e4", "613d0935341e9f055c320d81"];
+const exerciseAdminIds = (
+  process.env.EXERCISE_ADMIN_IDS || "612198502f4d5273b466b4e4,613d0935341e9f055c320d81"
+)
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+const EXERCISE_FIELDS = [
+  "exerciseTitle",
+  "muscleGroups",
+  "equipment",
+  "description",
+  "tags",
+  "generalVariation",
+  "attachments",
+  "anatomicalHandPosition",
+  "footSetup",
+  "handSetup",
+  "movementPattern",
+  "bodyPosition",
+  "verified",
+];
 
 const isExerciseAdmin = (user) => exerciseAdminIds.includes(user?._id?.toString());
 
@@ -11,9 +32,7 @@ const create_exercise = async (req, res, next) => {
     return res.status(403).send({ error: "Restricted" });
   }
 
-  let exercise = new Exercise({
-    ...req.body,
-  });
+  let exercise = new Exercise(pick(req.body, EXERCISE_FIELDS));
   try {
     await exercise.save();
     return res.send({
@@ -49,7 +68,11 @@ const update_exercise = (req, res, next) => {
     return res.status(403).send({ error: "Restricted" });
   }
 
-  Exercise.findOneAndUpdate({ _id: exercise._id }, { ...exercise }, { new: true })
+  Exercise.findOneAndUpdate(
+    { _id: exercise._id },
+    { $set: pick(exercise, EXERCISE_FIELDS) },
+    { new: true }
+  )
     .then((data) => {
       if (!data) return res.send({});
       res.send(data);

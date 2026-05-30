@@ -1,6 +1,6 @@
 const express = require('express');
 const relationshipController = require('../controllers/relationshipController');
-const { verifyAccessToken, verifyRefreshToken } = require("../middleware/auth");
+const { verifyAccessToken } = require("../middleware/auth");
 const { ensureWriteAccess } = require("../middleware/ensureWriteAccess");
 const { validate, Joi } = require('express-validation');
 

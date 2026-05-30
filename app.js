@@ -1,5 +1,6 @@
 const express = require("express");
 const bodyParser = require("body-parser");
+require("dotenv").config();
 const app = express();
 const http = require("http").Server(app);
 const bcrypt = require("bcrypt");
@@ -25,10 +26,37 @@ const invoiceRoutes = require("./routes/invoiceRoutes");
 const productRoutes = require("./routes/productRoutes");
 const GuardianLink = require("./models/guardianLink");
 const User = require("./models/user");
+const { isTrainerForClient, sameId } = require("./services/accessControl");
 const methodOverride = require("method-override");
+
+const defaultCorsOrigins = [
+  "https://www.firebellyfitness.com",
+  "https://firebellyfitness.com",
+  "https://app.firebellyfitness.com",
+];
+const corsOrigins = (process.env.CORS_ORIGINS || process.env.CLIENT_URL || process.env.APP_BASE_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+defaultCorsOrigins.forEach((origin) => corsOrigins.push(origin));
+const isAllowedCorsOrigin = (origin) => {
+  if (!origin) return true;
+  if (corsOrigins.includes(origin)) return true;
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+};
+const corsOptions = {
+  origin(origin, callback) {
+    if (isAllowedCorsOrigin(origin)) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+};
 global.io = require("./io").initialize(http, {
   cors: {
-    origin: "*",
+    origin(origin, callback) {
+      if (isAllowedCorsOrigin(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -50,7 +78,7 @@ const SALT_WORK_FACTOR = Number(process.env.SALT_WORK_FACTOR);
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.static(__dirname));
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -108,8 +136,20 @@ const emitPagePresence = (pageKey) => {
   });
 };
 
+global.io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (!token) return next(new Error("Unauthorized"));
+
+  jwt.verify(token, ACCESS_TOKEN_SECRET, (err, user) => {
+    if (err) return next(new Error("Unauthorized"));
+    socket.user = user;
+    return next();
+  });
+});
+
 global.io.on("connection", (socket) => {
-  const userId = socket.handshake.query.userId;
+  const socketUser = socket.user || {};
+  const userId = socketUser._id;
 
   // Save the user's socket ID
   connectedClients[userId] = socket.id;
@@ -132,8 +172,12 @@ global.io.on("connection", (socket) => {
     console.log(`Socket ${socket.id} left workout room ${workoutId}`);
   });
 
-  socket.on("joinWorkoutAccount", ({ accountId }) => {
+  socket.on("joinWorkoutAccount", async ({ accountId }) => {
     if (!accountId) return;
+    const canJoinOwnAccount = sameId(accountId, socketUser._id) || sameId(accountId, socketUser.viewedUserId);
+    const canJoinClientAccount =
+      socketUser.isTrainer && Boolean(await isTrainerForClient(socketUser._id, accountId));
+    if (!canJoinOwnAccount && !canJoinClientAccount) return;
     socket.join(`workouts:${accountId}`);
   });
 
@@ -249,7 +293,9 @@ app.use((err, req, res, next) => {
     return res.status(err.statusCode).json(err);
   }
   console.error(err.stack);
-  res.status(500).send(err.stack);
+  res.status(500).json({
+    error: process.env.NODE_ENV === "production" ? "Internal server error." : err.stack,
+  });
 });
 
 let server = http.listen(PORT, () => {

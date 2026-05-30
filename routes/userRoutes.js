@@ -1,6 +1,6 @@
 const express = require('express');
 const userController = require('../controllers/userController');
-const { verifyAccessToken, verifyRefreshToken } = require("../middleware/auth");
+const { verifyAccessToken } = require("../middleware/auth");
 const { ensureWriteAccess } = require("../middleware/ensureWriteAccess");
 const { validate, Joi } = require('express-validation');
 const { uploadProfilePicture } = require("../mygridfs");
@@ -55,5 +55,6 @@ router.post('/user/upload/profilePicture', verifyAccessToken, ensureWriteAccess,
 router.get('/user/profilePicture/:id', userController.get_profile_picture);
 router.get('/user/remove/image/', verifyAccessToken, ensureWriteAccess, userController.delete_profile_picture);
 router.post("/refresh-tokens", userController.refresh_tokens);
+router.post("/logout", userController.logout_user);
 
 module.exports = router;
