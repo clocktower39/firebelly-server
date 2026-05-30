@@ -3,11 +3,12 @@ const bodyParser = require("body-parser");
 require("dotenv").config();
 const app = express();
 const http = require("http").Server(app);
-const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const { ValidationError } = require("express-validation");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const userRoutes = require("./routes/userRoutes");
 const exerciseRoutes = require("./routes/exerciseRoutes");
 const trainingRoutes = require("./routes/trainingRoutes");
@@ -26,7 +27,8 @@ const invoiceRoutes = require("./routes/invoiceRoutes");
 const productRoutes = require("./routes/productRoutes");
 const GuardianLink = require("./models/guardianLink");
 const User = require("./models/user");
-const { isTrainerForClient, sameId } = require("./services/accessControl");
+const Training = require("./models/training");
+const { canWriteUserResource, isTrainerForClient, sameId } = require("./services/accessControl");
 const methodOverride = require("method-override");
 
 const defaultCorsOrigins = [
@@ -68,21 +70,28 @@ const utc = require("dayjs/plugin/utc");
 dayjs.extend(utc);
 dayjs.extend(advancedFormat);
 
-// require('dotenv').config();
 const dbUrl = process.env.DBURL;
 let PORT = process.env.PORT;
 if (PORT == null || PORT == "") {
   PORT = 8000;
 }
-const SALT_WORK_FACTOR = Number(process.env.SALT_WORK_FACTOR);
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET;
 
+app.set("trust proxy", 1);
+app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.static(__dirname));
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: "1mb" }));
 app.use(methodOverride("_method"));
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: process.env.NODE_ENV === "test" ? 10000 : 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
 
 app.use("/", userRoutes);
 app.use("/", exerciseRoutes);
@@ -160,7 +169,10 @@ global.io.on("connection", (socket) => {
   console.log(`${userId} connected with IP: ${socket.conn.remoteAddress}`);
 
   // Listen for a trainer or client joining a workout room
-  socket.on("joinWorkout", ({ workoutId }) => {
+  socket.on("joinWorkout", async ({ workoutId }) => {
+    if (!mongoose.Types.ObjectId.isValid(workoutId)) return;
+    const workout = await Training.findById(workoutId).select("user").lean();
+    if (!workout || !(await canWriteUserResource(socketUser, workout.user))) return;
     socket.join(workoutId);
     console.log(`Socket ${socket.id} joined workout room ${workoutId}`);
     // Notify other clients in the room that a new user joined.
@@ -285,7 +297,9 @@ const connectToDB = async () => {
   }
 };
 
-connectToDB();
+if (process.env.NODE_ENV !== "test") {
+  connectToDB();
+}
 
 // Error handling Function
 app.use((err, req, res, next) => {
@@ -298,6 +312,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-let server = http.listen(PORT, () => {
-  console.log(`Server is listening on port ${PORT}`);
-});
+let server = null;
+if (process.env.NODE_ENV !== "test") {
+  server = http.listen(PORT, () => {
+    console.log(`Server is listening on port ${PORT}`);
+  });
+}
+
+module.exports = {
+  app,
+  connectToDB,
+  http,
+  server,
+};

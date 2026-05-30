@@ -34,7 +34,7 @@ const createOpaqueToken = () => crypto.randomBytes(64).toString("base64url");
 
 const getRefreshTokenFromRequest = (req) => {
   const cookies = parseCookies(req.headers.cookie || "");
-  return cookies[REFRESH_COOKIE_NAME] || req.body?.refreshToken || null;
+  return cookies[REFRESH_COOKIE_NAME] || null;
 };
 
 const setRefreshCookie = (res, token) => {

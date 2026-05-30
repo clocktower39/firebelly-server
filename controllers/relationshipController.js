@@ -29,7 +29,12 @@ const manage_relationship = (req, res, next) => {
           return res.send({ status: "error", error: "Client does not exist" });
         }
 
-        let relationship = new Relationship(req.body);
+        let relationship = new Relationship({
+          trainer: req.body.trainer,
+          client: res.locals.user._id,
+          accepted: false,
+          requestedBy: "client",
+        });
         return relationship
           .save()
           .then((savedRelationship) => {

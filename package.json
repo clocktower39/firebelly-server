@@ -10,7 +10,9 @@
     "dayjs": "^1.11.20",
     "dotenv": "^17.4.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "express-validation": "^4.1.1",
+    "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
     "method-override": "^3.0.0",
     "mongoose": "^9.4.1",
@@ -21,7 +23,9 @@
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "mongodb-memory-server": "^11.2.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.2.2"
   },
   "scripts": {
     "start": "node app.js",
