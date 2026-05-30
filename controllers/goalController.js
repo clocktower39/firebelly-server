@@ -97,7 +97,7 @@ const update_goal = (req, res, next) => {
   Goal.findOneAndUpdate(
     { _id: req.body._id, user: res.locals.user._id },
     { $set: pick(req.body, GOAL_FIELDS) },
-    { new: true }
+    { returnDocument: "after" }
   )
     .populate("exercise", "_id exerciseTitle")
     .then((goal) => {
@@ -263,7 +263,7 @@ const mark_achievement_seen = async (req, res, next) => {
     const goal = await Goal.findOneAndUpdate(
       { _id: goalId, user: res.locals.user._id },
       { achievementSeen: true },
-      { new: true }
+      { returnDocument: "after" }
     )
       .populate("comments.user", "firstName lastName profilePicture")
       .populate("exercise", "_id exerciseTitle");

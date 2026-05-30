@@ -78,7 +78,7 @@ const revokeRefreshToken = async ({ token, req, replacedByTokenHash = null }) =>
       revokedByIp: getRequestIp(req),
       replacedByTokenHash,
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 };
 

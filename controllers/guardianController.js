@@ -9,7 +9,7 @@ const ensureGuardianAccount = async (guardianId) => {
   await User.findByIdAndUpdate(
     guardianId,
     { $set: { accountType: "guardian", ageBand: "18_plus" } },
-    { new: true }
+    { returnDocument: "after" }
   );
 };
 
@@ -234,7 +234,7 @@ const record_consent = async (req, res, next) => {
       },
     };
 
-    const child = await User.findByIdAndUpdate(childId, update, { new: true });
+    const child = await User.findByIdAndUpdate(childId, update, { returnDocument: "after" });
     if (!child) {
       return res.status(404).json({ error: "Child not found." });
     }
@@ -281,7 +281,7 @@ const add_child_email = async (req, res, next) => {
         "verified.verificationToken": verificationToken,
         "verified.verificationTokenExpires": verificationTokenExpires,
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!child) {

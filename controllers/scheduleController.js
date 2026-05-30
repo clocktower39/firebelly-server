@@ -121,7 +121,7 @@ const merge_open_availability = async (event) => {
   const merged = await ScheduleEvent.findByIdAndUpdate(
     event._id,
     { startDateTime: minStart, endDateTime: maxEnd },
-    { new: true }
+    { returnDocument: "after" }
   );
 
   return merged || event;
@@ -358,7 +358,7 @@ const update_schedule_event = async (req, res, next) => {
     if (updates?.payoutAmount !== undefined || updates?.payoutCurrency !== undefined) {
       Object.assign(updates, normalizePayout(updates.payoutAmount, updates.payoutCurrency));
     }
-    let updated = await ScheduleEvent.findByIdAndUpdate(_id, { $set: updates }, { new: true });
+    let updated = await ScheduleEvent.findByIdAndUpdate(_id, { $set: updates }, { returnDocument: "after" });
     updated = await merge_open_availability(updated);
 
     if (updated?.eventType === "APPOINTMENT" && updated.clientId) {
@@ -728,7 +728,7 @@ const respond_booking = async (req, res, next) => {
       updates.cancelledBy = userId;
     }
 
-    const updated = await ScheduleEvent.findByIdAndUpdate(_id, updates, { new: true });
+    const updated = await ScheduleEvent.findByIdAndUpdate(_id, updates, { returnDocument: "after" });
     return res.json({ event: updated });
   } catch (err) {
     return next(err);

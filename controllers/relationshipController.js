@@ -142,7 +142,7 @@ const update_metrics_approval = (req, res, next) => {
   Relationship.findOneAndUpdate(
     { trainer, client: res.locals.user._id },
     { metricsApprovalRequired },
-    { new: true }
+    { returnDocument: "after" }
   )
     .then((data) => {
       if (!data) return res.status(404).send({ message: "Relationship not found." });
@@ -166,7 +166,7 @@ const update_relationship_profile = (req, res, next) => {
   Relationship.findOneAndUpdate(
     { trainer: res.locals.user._id, client },
     updates,
-    { new: true }
+    { returnDocument: "after" }
   )
     .then((data) => {
       if (!data) return res.status(404).send({ message: "Relationship not found." });

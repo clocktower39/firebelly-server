@@ -183,7 +183,7 @@ const update_session_type = async (req, res, next) => {
         updates.creditsRequired = spec.creditsRequired;
       }
     }
-    const updated = await SessionType.findByIdAndUpdate(id, updates, { new: true });
+    const updated = await SessionType.findByIdAndUpdate(id, updates, { returnDocument: "after" });
     return res.json({ sessionType: updated });
   } catch (err) {
     return next(err);

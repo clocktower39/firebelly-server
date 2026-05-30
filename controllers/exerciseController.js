@@ -71,7 +71,7 @@ const update_exercise = (req, res, next) => {
   Exercise.findOneAndUpdate(
     { _id: exercise._id },
     { $set: pick(exercise, EXERCISE_FIELDS) },
-    { new: true }
+    { returnDocument: "after" }
   )
     .then((data) => {
       if (!data) return res.send({});

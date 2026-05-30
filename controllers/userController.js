@@ -357,7 +357,7 @@ const update_user = async (req, res, next) => {
     const user = await User.findByIdAndUpdate(
       res.locals.user._id,
       { $set: updates },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!user) {

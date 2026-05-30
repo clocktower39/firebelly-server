@@ -27,7 +27,7 @@ const createTrainingValidate = {
 const updateTrainingValidate = {
   body: Joi.object({
     _id: objectId.required(),
-    training: Joi.object(trainingFields).required(),
+    training: Joi.object(trainingFields).unknown(true).required(),
   }),
 };
 const idBodyValidate = {

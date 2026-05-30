@@ -183,7 +183,7 @@ const update_product = async (req, res, next) => {
       updates.creditsPerUnit = 0;
     }
 
-    const updated = await Product.findByIdAndUpdate(id, updates, { new: true });
+    const updated = await Product.findByIdAndUpdate(id, updates, { returnDocument: "after" });
     return res.json({ product: updated });
   } catch (err) {
     if (err?.code === 11000) {

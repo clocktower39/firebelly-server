@@ -139,7 +139,7 @@ const review_metric = async (req, res, next) => {
     const entry = await MetricEntry.findOneAndUpdate(
       { _id: entryId, user: res.locals.user._id, status: "pending" },
       { status, reviewedBy: res.locals.user._id, reviewedAt: new Date() },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!entry) {
       return res.status(404).send({ error: "Pending metric entry not found." });

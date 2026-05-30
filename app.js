@@ -44,7 +44,25 @@ defaultCorsOrigins.forEach((origin) => corsOrigins.push(origin));
 const isAllowedCorsOrigin = (origin) => {
   if (!origin) return true;
   if (corsOrigins.includes(origin)) return true;
-  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  if (process.env.NODE_ENV === "production") return false;
+
+  try {
+    const { hostname, protocol } = new URL(origin);
+    const isHttp = protocol === "http:" || protocol === "https:";
+    const isLocalHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "[::1]" ||
+      hostname === "0.0.0.0";
+    const isPrivateLan =
+      /^10\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+    return isHttp && (isLocalHost || isPrivateLan);
+  } catch {
+    return false;
+  }
 };
 const corsOptions = {
   origin(origin, callback) {
