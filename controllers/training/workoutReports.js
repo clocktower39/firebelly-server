@@ -116,7 +116,7 @@ const workout_templates_request = async (req, res, next) => {
     }
 
     // Get connected trainer IDs with template permissions
-    const TrainerConnection = require("../models/trainerConnection");
+    const TrainerConnection = require("../../models/trainerConnection");
     const connections = await TrainerConnection.find({
       $or: [{ requester: user._id }, { recipient: user._id }],
       status: "accepted",
