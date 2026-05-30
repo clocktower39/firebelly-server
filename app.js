@@ -97,6 +97,10 @@ const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
 
 app.set("trust proxy", 1);
 app.use(helmet());
+app.use(["/user/profilePicture", "/groups/picture"], (req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
 app.use(cors(corsOptions));
 app.use(express.static(__dirname));
 app.use(bodyParser.urlencoded({ extended: false }));
